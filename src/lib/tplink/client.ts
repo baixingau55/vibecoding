@@ -158,13 +158,14 @@ export async function bootstrapTpLinkMessageSubscription(payload: {
   callbackUrl: string;
   signSecret: string;
 }) {
-  const configResponse = await tpLinkPost<{ error_code: number }>("/tums/open/messageSubscribe/v1/updateAppMsgConfig", {
-    callbackAddress: payload.callbackUrl,
-    enable: 1
+  const configResponse = await tpLinkPost<{ error_code: number }>("/tums/open/msgTranspond/v1/setAppMsgPushConfig", {
+    serverUrl: payload.callbackUrl,
+    openMsgTransport: 1,
+    msgContentType: []
   });
 
-  const signResponse = await tpLinkPost<{ error_code: number }>("/tums/open/messageSubscribe/v1/setAppPushSignSecret", {
-    signSecret: payload.signSecret
+  const signResponse = await tpLinkPost<{ error_code: number }>("/tums/open/msgTranspond/v1/setAppMsgPushSk", {
+    sk: payload.signSecret
   });
 
   return { configResponse, signResponse };

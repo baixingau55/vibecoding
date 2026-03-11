@@ -28,8 +28,8 @@
 
 ### 5. 消息订阅初始化路径
 - 文件：`src/lib/tplink/client.ts`
-- 当前行为：消息订阅配置接口是按文档推断接入。
-- 替换方式：部署到 Vercel 后，用真实联调结果修正 path、payload、签名密钥设置流程。
+- 当前行为：已按开放接口文档修正为 `/tums/open/msgTranspond/v1/setAppMsgPushConfig` 和 `/tums/open/msgTranspond/v1/setAppMsgPushSk`。
+- 仍需确认：消息类型是否要继续保持空数组全量订阅，还是切换为明确的 `msgContentType` 白名单。
 
 ### 6. AI 任务执行模拟结果
 - 文件：`src/lib/domain/tasks.ts`

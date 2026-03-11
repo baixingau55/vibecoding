@@ -18,7 +18,13 @@
 - 查询任务结果
   - `/openapi/aiInspection/v1/getAiInspectionTaskResult`
 - 应用级消息订阅配置
-  - 当前项目预留为自动初始化步骤
+  - `/tums/open/msgTranspond/v1/setAppMsgPushConfig`
+- 应用级消息订阅配置查询
+  - `/tums/open/msgTranspond/v1/getAppMsgPushConfig`
+- 应用报警消息推送签名密钥
+  - `/tums/open/msgTranspond/v1/setAppMsgPushSk`
+- 应用报警消息推送签名密钥查询
+  - `/tums/open/msgTranspond/v1/getAppMsgPushSk`
 
 ## 签名规则
 
@@ -44,5 +50,4 @@
 
 ## 当前占位说明
 
-项目已经接入真实签名逻辑与关键 API 路由，但部分设备查询、消息订阅具体 Path/字段仍保留为可替换适配层，详见 [docs/operations/placeholder-register.md](../operations/placeholder-register.md)。
-
+项目已经接入真实签名逻辑与关键 API 路由，但部分设备查询、消息回调落库和媒体链路仍保留为可替换适配层，详见 [docs/operations/placeholder-register.md](../operations/placeholder-register.md)。
