@@ -107,12 +107,17 @@ export async function bootstrapTpLinkSubscriptions() {
   }
 
   const callbackUrl = `${env.appBaseUrl}/api/callbacks/tplink/messages`;
+  const normalizedSignSecret = env.tpLinkMessageSignSecret.replace(/[^0-9a-zA-Z]/g, "").slice(0, 32);
+  if (!normalizedSignSecret) {
+    return { ok: false, reason: "TP_LINK_MESSAGE_SIGN_SECRET cannot be normalized to a valid TP-LINK secret" };
+  }
+
   const result = await bootstrapTpLinkMessageSubscription({
     callbackUrl,
-    signSecret: env.tpLinkMessageSignSecret
+    signSecret: normalizedSignSecret
   });
 
-  return { ok: true, callbackUrl, result };
+  return { ok: true, callbackUrl, signSecretApplied: normalizedSignSecret, result };
 }
 
 export async function executeTask(taskId: string) {
