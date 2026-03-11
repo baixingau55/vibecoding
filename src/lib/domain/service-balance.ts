@@ -1,4 +1,4 @@
-import { getMemoryStore } from "@/lib/repositories/memory-store";
+import { getAppStore } from "@/lib/repositories/app-store";
 import { slugId } from "@/lib/utils";
 
 import { getAppSnapshot } from "@/lib/domain/store";
@@ -15,8 +15,8 @@ export async function getPurchaseHistory() {
 }
 
 export async function purchaseServiceUnits(input: { amount: number; accountName?: string; note?: string }) {
-  const store = getMemoryStore();
-  const snapshot = store.snapshot();
+  const store = await getAppStore();
+  const snapshot = await store.snapshot();
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     total: snapshot.serviceBalance.total + input.amount,
@@ -43,13 +43,13 @@ export async function purchaseServiceUnits(input: { amount: number; accountName?
     note: record.note
   };
 
-  store.addPurchase(record, ledger, nextBalance);
+  await store.addPurchase(record, ledger, nextBalance);
   return { balance: nextBalance, record };
 }
 
 export async function chargeUnits(taskId: string, amount: number) {
-  const store = getMemoryStore();
-  const snapshot = store.snapshot();
+  const store = await getAppStore();
+  const snapshot = await store.snapshot();
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     remaining: Math.max(snapshot.serviceBalance.remaining - amount, 0),
@@ -57,13 +57,13 @@ export async function chargeUnits(taskId: string, amount: number) {
     lastUpdatedAt: new Date().toISOString()
   };
 
-  store.setBalance(nextBalance);
+  await store.setBalance(nextBalance);
   return nextBalance;
 }
 
 export async function refundUnits(taskId: string, amount: number) {
-  const store = getMemoryStore();
-  const snapshot = store.snapshot();
+  const store = await getAppStore();
+  const snapshot = await store.snapshot();
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     remaining: snapshot.serviceBalance.remaining + amount,
@@ -71,6 +71,6 @@ export async function refundUnits(taskId: string, amount: number) {
     lastUpdatedAt: new Date().toISOString()
   };
 
-  store.setBalance(nextBalance);
+  await store.setBalance(nextBalance);
   return nextBalance;
 }

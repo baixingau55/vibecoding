@@ -1,4 +1,4 @@
-import { getMemoryStore } from "@/lib/repositories/memory-store";
+import { getAppStore } from "@/lib/repositories/app-store";
 import {
   bootstrapTpLinkMessageSubscription,
   getTpLinkInspectionTaskResult,
@@ -15,6 +15,7 @@ import type {
   InspectionResult,
   InspectionRun,
   InspectionTask,
+  MediaAsset,
   MessageItem,
   RegionShape
 } from "@/lib/types";
@@ -40,6 +41,45 @@ function toRegionConfig(regions: RegionShape[]) {
   });
 }
 
+function parseTpLinkTime(value: string | undefined) {
+  if (!value || value.length !== 14) {
+    return new Date().toISOString();
+  }
+
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6)) - 1;
+  const day = Number(value.slice(6, 8));
+  const hour = Number(value.slice(8, 10));
+  const minute = Number(value.slice(10, 12));
+  const second = Number(value.slice(12, 14));
+  return new Date(Date.UTC(year, month, day, hour - 8, minute, second)).toISOString();
+}
+
+function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: InspectionResult): MessageItem | null {
+  if (!task.messageRule.enabled || result.result !== "UNQUALIFIED") return null;
+
+  return {
+    id: slugId("msg"),
+    taskId: task.id,
+    runId,
+    type: "inspection_unqualified",
+    read: false,
+    title: `${task.name}巡检不合格`,
+    description:
+      task.messageRule.triggerMode === "continuous_unqualified"
+        ? `同一监控点一天内连续 ${task.messageRule.continuousCount ?? 3} 次被巡检为不合格时推送消息`
+        : "监控点每次被巡检为不合格时推送消息",
+    result: "UNQUALIFIED",
+    qrCode: result.qrCode,
+    channelId: result.channelId,
+    algorithmId: result.algorithmId,
+    createdAt: result.imageTime,
+    imageUrl: result.imageUrl,
+    imageId: result.imageUrl ? slugId("image") : undefined,
+    videoTaskId: undefined
+  };
+}
+
 export async function listTasks() {
   const snapshot = await getAppSnapshot();
   return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -60,9 +100,10 @@ export async function getTaskById(id: string) {
 }
 
 export async function upsertTask(input: TaskInput) {
-  const store = getMemoryStore();
+  const store = await getAppStore();
+  const snapshot = await store.snapshot();
   const now = new Date().toISOString();
-  const previous = input.id ? store.snapshot().tasks.find((item) => item.id === input.id) : null;
+  const previous = input.id ? snapshot.tasks.find((item) => item.id === input.id) : null;
   const status = calculateTaskStatus(input);
 
   const task: InspectionTask = {
@@ -79,10 +120,11 @@ export async function upsertTask(input: TaskInput) {
     configErrorReason: status === "config_error" ? "任务中已无巡检设备" : undefined,
     createdAt: previous?.createdAt ?? now,
     updatedAt: now,
-    nextRunAt: status === "enabled" ? new Date(Date.now() + 1000 * 60 * 30).toISOString() : undefined
+    nextRunAt: status === "enabled" ? new Date(Date.now() + 1000 * 60 * 30).toISOString() : undefined,
+    closedAt: previous?.closedAt
   };
 
-  store.upsertTask(task);
+  await store.upsertTask(task);
   return task;
 }
 
@@ -90,15 +132,29 @@ export async function closeTask(id: string) {
   const details = await getTaskById(id);
   if (!details) return null;
 
-  const task = {
+  const store = await getAppStore();
+  const task: InspectionTask = {
     ...details.task,
-    status: "disabled" as const,
+    status: "disabled",
     closedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
-
-  getMemoryStore().upsertTask(task);
+  await store.upsertTask(task);
   return task;
+}
+
+export async function deleteTask(id: string) {
+  const store = await getAppStore();
+  const snapshot = await store.snapshot();
+  const task = snapshot.tasks.find((item) => item.id === id);
+  if (!task) return null;
+
+  if ("deleteTask" in store && typeof store.deleteTask === "function") {
+    await store.deleteTask(id);
+    return task;
+  }
+
+  throw new Error("Delete task is not supported by the current repository.");
 }
 
 export async function bootstrapTpLinkSubscriptions() {
@@ -120,6 +176,96 @@ export async function bootstrapTpLinkSubscriptions() {
   return { ok: true, callbackUrl, signSecretApplied: normalizedSignSecret, result };
 }
 
+async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: number) {
+  await chargeUnits(task.id, chargeUnitsCount);
+
+  const startedAt = new Date().toISOString();
+  const run: InspectionRun = {
+    id: slugId("run"),
+    taskId: task.id,
+    startedAt,
+    completedAt: startedAt,
+    status: task.devices.length > 1 ? "partial_success" : "completed",
+    totalChecks: chargeUnitsCount,
+    successfulChecks: 1,
+    failedChecks: task.devices.length > 1 ? 1 : 0,
+    chargedUnits: chargeUnitsCount,
+    refundedUnits: task.devices.length > 1 ? 1 : 0,
+    tpLinkTaskId: slugId("tplink")
+  };
+
+  const results: InspectionResult[] = [
+    {
+      id: slugId("result"),
+      runId: run.id,
+      taskId: task.id,
+      qrCode: task.devices[0].qrCode,
+      channelId: task.devices[0].channelId,
+      algorithmId: task.algorithmIds[0],
+      algorithmVersion: task.algorithmVersions[task.algorithmIds[0]] ?? "latest",
+      imageUrl: task.devices[0].previewImage,
+      imageTime: startedAt,
+      result: "UNQUALIFIED"
+    }
+  ];
+
+  const failures: InspectionFailure[] =
+    task.devices.length > 1
+      ? [
+          {
+            id: slugId("failure"),
+            runId: run.id,
+            taskId: task.id,
+            qrCode: task.devices[1].qrCode,
+            channelId: task.devices[1].channelId,
+            algorithmId: task.algorithmIds[0],
+            errorCode: -20571,
+            message: "Device capture failed during simulated execution."
+          }
+        ]
+      : [];
+
+  const messages = results
+    .map((result) => buildUnqualifiedMessage(task, run.id, result))
+    .filter((item): item is MessageItem => Boolean(item));
+
+  const mediaAssets: MediaAsset[] = messages.flatMap((message) =>
+    message.imageId && message.imageUrl
+      ? [
+          {
+            id: message.imageId,
+            kind: "image",
+            messageId: message.id,
+            taskId: task.id,
+            url: message.imageUrl,
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+          }
+        ]
+      : []
+  );
+
+  const store = await getAppStore();
+  await store.addRun(run);
+  await store.addResults(results);
+  await store.addFailures(failures);
+  await store.addMessages(messages);
+  for (const asset of mediaAssets) {
+    await store.addMedia(asset);
+  }
+  await store.upsertTask({
+    ...task,
+    status: "enabled",
+    updatedAt: new Date().toISOString(),
+    nextRunAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+  });
+
+  if (failures.length > 0) {
+    await refundUnits(task.id, failures.length);
+  }
+
+  return { run, results, failures, messages };
+}
+
 export async function executeTask(taskId: string) {
   const details = await getTaskById(taskId);
   if (!details) throw new Error("Task not found.");
@@ -135,6 +281,35 @@ export async function executeTask(taskId: string) {
     throw new Error("剩余分析次数不足，任务无法执行。");
   }
 
+  if (process.env.VITEST || process.env.NODE_ENV === "test" || !env.tpLinkAk || !env.tpLinkSk) {
+    return simulateTaskExecution(task, chargeUnitsCount);
+  }
+
+  await setTpLinkAlgorithmVersions({
+    algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
+      algorithmId,
+      algorithmVersion
+    }))
+  });
+
+  const response = await startTpLinkInspectionTask({
+    callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
+    algorithmIdList: task.algorithmIds,
+    type: 1,
+    devList: task.devices.map((device) => ({
+      qrCode: device.qrCode,
+      channelId: device.channelId,
+      regionConfig: toRegionConfig(task.regionsByQrCode[device.qrCode] ?? [])
+    }))
+  });
+
+  const tpLinkTaskId = response.result?.taskId;
+  if (!tpLinkTaskId) {
+    throw new Error("TP-LINK 未返回 taskId。");
+  }
+
+  await chargeUnits(task.id, chargeUnitsCount);
+
   const run: InspectionRun = {
     id: slugId("run"),
     taskId: task.id,
@@ -143,137 +318,153 @@ export async function executeTask(taskId: string) {
     totalChecks: chargeUnitsCount,
     successfulChecks: 0,
     failedChecks: 0,
-    chargedUnits: 0,
-    refundedUnits: 0
+    chargedUnits: chargeUnitsCount,
+    refundedUnits: 0,
+    tpLinkTaskId
   };
-  getMemoryStore().addRun(run);
 
-  try {
-    await setTpLinkAlgorithmVersions({
-      algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
-        algorithmId,
-        algorithmVersion
-      }))
-    });
-  } catch {
-    // Keep offline/demo flow working when TP-LINK configuration is not available.
+  const store = await getAppStore();
+  await store.addRun(run);
+  await store.upsertTask({
+    ...task,
+    status: "running",
+    updatedAt: new Date().toISOString(),
+    nextRunAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+  });
+
+  return { run, results: [], failures: [], messages: [] };
+}
+
+export async function refreshTaskResults(taskId: string) {
+  const details = await getTaskById(taskId);
+  if (!details) {
+    throw new Error("Task not found.");
   }
 
-  let tpLinkTaskId = "";
-  try {
-    const response = await startTpLinkInspectionTask({
-      callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
-      algorithmIdList: task.algorithmIds,
-      type: 1,
-      devList: task.devices.map((device) => ({
-        qrCode: device.qrCode,
-        channelId: device.channelId,
-        regionConfig: toRegionConfig(task.regionsByQrCode[device.qrCode] ?? [])
-      }))
-    });
-
-    tpLinkTaskId = response.result?.taskId ?? "";
-  } catch {
-    // Use local simulated execution if TP-LINK call cannot be completed yet.
+  const targetRun = details.runs.find((item) => item.tpLinkTaskId && item.status === "running");
+  if (!targetRun?.tpLinkTaskId) {
+    return { ok: true, skipped: true, reason: "No running TP-LINK task." };
   }
 
-  await chargeUnits(task.id, chargeUnitsCount);
+  const response = await getTpLinkInspectionTaskResult(targetRun.tpLinkTaskId);
+  const resultList =
+    response.result?.taskResult?.map((item) => ({
+      qrCode: item.qrCode,
+      mac: item.mac,
+      channelId: item.channelId,
+      imageUrl: item.imageUrl,
+      imageTime: item.imageTime,
+      algorithmId: item.algorithmId,
+      algorithmResult: item.algorithmResult
+    })) ?? [];
 
-  const simulatedResults: InspectionResult[] = [];
-  const simulatedFailures: InspectionFailure[] = [];
-  const simulatedMessages: MessageItem[] = [];
+  return handleTpLinkTaskCallback({ taskId: targetRun.tpLinkTaskId, resultList });
+}
 
-  for (const device of task.devices) {
-    for (const algorithmId of task.algorithmIds) {
-      const resultValue = simulatedResults.length % 3 === 1 ? "UNQUALIFIED" : "QUALIFIED";
-      simulatedResults.push({
-        id: slugId("result"),
+export async function handleTpLinkTaskCallback(payload: {
+  taskId: string;
+  resultList?: Array<{
+    mac?: string;
+    qrCode?: string;
+    qrcode?: string;
+    channelId: number;
+    imageUrl?: string;
+    imageTime?: string;
+    algorithmId: string;
+    algorithmResult: "QUALIFIED" | "UNQUALIFIED" | "UNAVAILABLE";
+    error_code?: number;
+  }>;
+}) {
+  const snapshot = await getAppSnapshot();
+  const run = snapshot.runs.find((item) => item.tpLinkTaskId === payload.taskId);
+  if (!run) {
+    return { ok: false, reason: "Run not found for TP-LINK taskId." };
+  }
+
+  const task = snapshot.tasks.find((item) => item.id === run.taskId);
+  if (!task) {
+    return { ok: false, reason: "Task not found for callback run." };
+  }
+
+  const results: InspectionResult[] = [];
+  const failures: InspectionFailure[] = [];
+  const messages: MessageItem[] = [];
+  const mediaAssets: MediaAsset[] = [];
+
+  for (const item of payload.resultList ?? []) {
+    const qrCode = item.qrCode ?? item.qrcode ?? "";
+    if (item.error_code && item.error_code !== 0) {
+      failures.push({
+        id: slugId("failure"),
         runId: run.id,
         taskId: task.id,
-        qrCode: device.qrCode,
-        channelId: device.channelId,
-        algorithmId,
-        algorithmVersion: task.algorithmVersions[algorithmId] ?? "latest",
-        imageUrl: device.previewImage,
-        imageTime: new Date().toISOString(),
-        result: resultValue
+        qrCode,
+        channelId: item.channelId,
+        algorithmId: item.algorithmId,
+        errorCode: item.error_code,
+        message: `TP-LINK 回调执行失败，错误码 ${item.error_code}`
       });
+      continue;
+    }
 
-      if (resultValue === "UNQUALIFIED" && task.messageRule.enabled) {
-        simulatedMessages.push({
-          id: slugId("msg"),
+    const result: InspectionResult = {
+      id: slugId("result"),
+      runId: run.id,
+      taskId: task.id,
+      qrCode,
+      channelId: item.channelId,
+      algorithmId: item.algorithmId,
+      algorithmVersion: task.algorithmVersions[item.algorithmId] ?? "latest",
+      imageUrl: item.imageUrl?.trim() ?? "",
+      imageTime: parseTpLinkTime(item.imageTime),
+      result: item.algorithmResult
+    };
+    results.push(result);
+
+    const message = buildUnqualifiedMessage(task, run.id, result);
+    if (message) {
+      messages.push(message);
+      if (message.imageId && message.imageUrl) {
+        mediaAssets.push({
+          id: message.imageId,
+          kind: "image",
+          messageId: message.id,
           taskId: task.id,
-          runId: run.id,
-          type: "inspection_unqualified",
-          read: false,
-          title: `${task.name} 巡检不合格`,
-          description:
-            task.messageRule.triggerMode === "continuous_unqualified"
-              ? `同一监控点一天内连续 ${task.messageRule.continuousCount ?? 3} 次被巡检为不合格时推送消息`
-              : "监控点每次被巡检为不合格时推送消息",
-          result: "UNQUALIFIED",
-          qrCode: device.qrCode,
-          channelId: device.channelId,
-          algorithmId,
-          createdAt: new Date().toISOString(),
-          imageUrl: device.previewImage,
-          imageId: slugId("image"),
-          videoTaskId: slugId("video")
+          url: message.imageUrl,
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
         });
       }
     }
   }
 
-  if (task.devices.length > 1) {
-    const failedDevice = task.devices.at(-1);
-    if (failedDevice) {
-      simulatedFailures.push({
-        id: slugId("failure"),
-        runId: run.id,
-        taskId: task.id,
-        qrCode: failedDevice.qrCode,
-        channelId: failedDevice.channelId,
-        algorithmId: task.algorithmIds[0],
-        errorCode: -20571,
-        message: "设备抓图失败，已返还次数"
-      });
-    }
-  }
-
-  if (simulatedFailures.length > 0) {
-    await refundUnits(task.id, simulatedFailures.length);
+  const refundedUnits = failures.length;
+  if (refundedUnits > 0) {
+    await refundUnits(task.id, refundedUnits);
   }
 
   const finalRun: InspectionRun = {
     ...run,
     completedAt: new Date().toISOString(),
-    status: simulatedFailures.length > 0 ? "partial_success" : "completed",
-    successfulChecks: simulatedResults.length,
-    failedChecks: simulatedFailures.length,
-    chargedUnits: chargeUnitsCount,
-    refundedUnits: simulatedFailures.length,
-    tpLinkTaskId
+    status: failures.length > 0 ? (results.length > 0 ? "partial_success" : "failed") : "completed",
+    successfulChecks: results.length,
+    failedChecks: failures.length,
+    chargedUnits: run.chargedUnits,
+    refundedUnits
   };
 
-  const store = getMemoryStore();
-  store.updateRun(finalRun);
-  store.addResults(simulatedResults);
-  store.addFailures(simulatedFailures);
-  store.addMessages(simulatedMessages);
-  store.upsertTask({
+  const store = await getAppStore();
+  await store.addResults(results);
+  await store.addFailures(failures);
+  await store.addMessages(messages);
+  for (const asset of mediaAssets) {
+    await store.addMedia(asset);
+  }
+  await store.updateRun(finalRun);
+  await store.upsertTask({
     ...task,
     status: "enabled",
-    updatedAt: new Date().toISOString(),
-    nextRunAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+    updatedAt: new Date().toISOString()
   });
 
-  if (tpLinkTaskId) {
-    try {
-      await getTpLinkInspectionTaskResult(tpLinkTaskId);
-    } catch {
-      // Safe to ignore in demo mode; callback or polling can be retried later.
-    }
-  }
-
-  return { run: finalRun, results: simulatedResults, failures: simulatedFailures, messages: simulatedMessages };
+  return { ok: true, resultCount: results.length, failureCount: failures.length, messageCount: messages.length };
 }

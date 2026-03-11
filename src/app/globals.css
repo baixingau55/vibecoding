@@ -890,6 +890,7 @@ button {
   flex-direction: column;
   gap: 18px;
   padding: 24px;
+  overflow: visible;
   background: #fff;
   border-radius: 16px;
   box-shadow: var(--shadow-panel);
@@ -1016,6 +1017,7 @@ button {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
+  z-index: 24;
   display: flex;
   flex-direction: column;
   min-width: 128px;
@@ -1024,6 +1026,15 @@ button {
   border: 1px solid #edf0f5;
   border-radius: 12px;
   box-shadow: var(--shadow-float);
+}
+
+.ai-task-card-menu-wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.ai-task-card-menu-open {
+  z-index: 8;
 }
 
 .ai-task-menu button {

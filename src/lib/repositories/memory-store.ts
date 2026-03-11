@@ -51,6 +51,14 @@ export function getMemoryStore() {
         store.tasks.unshift(clone(task));
       }
     },
+    deleteTask(taskId: string) {
+      store.tasks = store.tasks.filter((item) => item.id !== taskId);
+      store.runs = store.runs.filter((item) => item.taskId !== taskId);
+      store.results = store.results.filter((item) => item.taskId !== taskId);
+      store.failures = store.failures.filter((item) => item.taskId !== taskId);
+      store.messages = store.messages.filter((item) => item.taskId !== taskId);
+      store.media = store.media.filter((item) => item.taskId !== taskId);
+    },
     addRun(run: InspectionRun) {
       store.runs.unshift(clone(run));
     },
@@ -80,4 +88,3 @@ export function getMemoryStore() {
     }
   };
 }
-

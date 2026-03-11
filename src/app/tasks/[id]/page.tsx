@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { TaskDetailView } from "@/components/tasks/task-detail-view";
 import { getAlgorithms } from "@/lib/domain/algorithms";
+import { getMediaForMessage } from "@/lib/domain/media";
 import { getAppSnapshot } from "@/lib/domain/store";
 import { getTaskById } from "@/lib/domain/tasks";
 
@@ -13,6 +14,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     notFound();
   }
 
+  const mediaEntries = await Promise.all(detail.messages.map(async (message) => [message.id, await getMediaForMessage(message.id)] as const));
+  const mediaByMessage = Object.fromEntries(mediaEntries);
+
   return (
     <TaskDetailView
       task={detail.task}
@@ -20,6 +24,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
       results={detail.results}
       failures={detail.failures}
       messages={detail.messages}
+      mediaByMessage={mediaByMessage}
       algorithms={algorithms}
       devices={snapshot.devices}
     />

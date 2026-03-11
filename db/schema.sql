@@ -47,6 +47,7 @@ create table if not exists inspection_tasks (
   status text not null,
   algorithm_ids jsonb not null default '[]'::jsonb,
   algorithm_versions jsonb not null default '{}'::jsonb,
+  inspection_rule jsonb,
   message_rule jsonb not null default '{}'::jsonb,
   config_error_reason text,
   next_run_at timestamptz,
@@ -73,7 +74,8 @@ create table if not exists inspection_task_schedules (
   schedule_type text not null,
   start_time text not null,
   end_time text,
-  repeat_days jsonb not null default '[]'::jsonb
+  repeat_days jsonb not null default '[]'::jsonb,
+  interval_minutes integer
 );
 
 create table if not exists inspection_task_regions (

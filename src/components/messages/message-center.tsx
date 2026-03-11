@@ -1,19 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import type { MediaAsset, MessageItem } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
-
-const tabs = [
-  { key: "inspection_unqualified", label: "离岗检测", badge: "99+" },
-  { key: "custom", label: "此处显示任务的自定义消息类型", badge: "9" },
-  { key: "no_device", label: "任务下无设备" },
-  { key: "algorithm_error", label: "算法失效" },
-  { key: "no_balance", label: "算法服务可用次数不足" }
-] as const;
 
 export function MessageCenter({
   initialMessages,
@@ -25,58 +18,32 @@ export function MessageCenter({
   const [messages, setMessages] = useState(initialMessages);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["key"]>("inspection_unqualified");
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [confirmAllRead, setConfirmAllRead] = useState(false);
-  const [filterState, setFilterState] = useState({ status: "all", day: "", hour: "" });
+  const [filterState, setFilterState] = useState({ status: "all", day: "", hour: "", type: "all" });
+
+  const messageTypes = useMemo(() => Array.from(new Set(messages.map((item) => item.type))), [messages]);
 
   const filteredMessages = useMemo(() => {
     return messages.filter((item) => {
-      if (activeTab === "inspection_unqualified" && item.type !== "inspection_unqualified") return false;
-      if (query.trim() && !item.title.includes(query.trim()) && !item.algorithmId.includes(query.trim())) return false;
+      if (query.trim() && !item.title.includes(query.trim()) && !item.algorithmId.includes(query.trim()) && !item.qrCode.includes(query.trim())) {
+        return false;
+      }
       if (filterState.status === "unread" && item.read) return false;
       if (filterState.status === "read" && !item.read) return false;
-      if (filterState.day && !item.createdAt.startsWith(filterState.day)) return false;
-      if (filterState.hour && !item.createdAt.slice(11, 13).startsWith(filterState.hour.padStart(2, "0"))) return false;
+      if (filterState.type !== "all" && item.type !== filterState.type) return false;
+      if (filterState.day && item.createdAt.slice(0, 10) !== filterState.day) return false;
+      if (filterState.hour && item.createdAt.slice(11, 13) !== filterState.hour.padStart(2, "0")) return false;
       return true;
     });
-  }, [activeTab, filterState, messages, query]);
+  }, [filterState, messages, query]);
 
-  const visibleMessages = useMemo(() => {
-    if (filteredMessages.length >= 5) return filteredMessages;
-    const seed = filteredMessages[0] ?? messages[0];
-    if (!seed) return [];
-    const placeholders = Array.from({ length: Math.max(0, 5 - filteredMessages.length) }, (_, index) => ({
-      ...seed,
-      id: `${seed.id}-clone-${index}`,
-      read: index > 1,
-      title:
-        index === 0
-          ? "离岗检测"
-          : index === 1
-            ? "此处显示任务的自定义消息类型"
-            : index === 2
-              ? "任务下无设备"
-              : index === 3
-                ? "算法失效"
-                : "算法服务可用次数不足",
-      description:
-        index === 0
-          ? "连续3次检出空岗"
-          : index === 1
-            ? "此处显示任务的自定义消息描述"
-            : index === 2
-              ? "无巡检设备，任务无法执行"
-              : index === 3
-                ? "算法已失效，任务无法执行"
-                : "服务剩余次数不足，所有任务无法执行"
-    }));
-    return [...filteredMessages, ...placeholders];
-  }, [filteredMessages, messages]);
-
-  const selectedMessage = messages.find((item) => item.id === selectedId) ?? null;
-  const selectedIndex = visibleMessages.findIndex((item) => item.id === selectedId);
+  const selectedMessage = filteredMessages.find((item) => item.id === selectedId) ?? messages.find((item) => item.id === selectedId) ?? null;
+  const selectedIndex = filteredMessages.findIndex((item) => item.id === selectedId);
+  const selectedMedia = selectedMessage ? mediaByMessage[selectedMessage.id] ?? [] : [];
+  const imageMedia = selectedMedia.find((item) => item.kind === "image");
+  const videoMedia = selectedMedia.find((item) => item.kind === "video");
 
   async function markRead(id: string) {
     await fetch(`/api/messages/${id}/read`, { method: "POST" });
@@ -90,7 +57,7 @@ export function MessageCenter({
   }
 
   async function markAllAsRead() {
-    const ids = visibleMessages.map((item) => item.id);
+    const ids = filteredMessages.map((item) => item.id);
     await Promise.all(ids.map((id) => fetch(`/api/messages/${id}/read`, { method: "POST" })));
     setMessages((current) => current.map((item) => (ids.includes(item.id) ? { ...item, read: true } : item)));
     setCheckedIds([]);
@@ -101,17 +68,10 @@ export function MessageCenter({
     <div className="ai-page ai-message-page">
       <section className="ai-panel ai-message-shell">
         <div className="ai-message-tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={tab.key === activeTab ? "ai-message-tab ai-message-tab-active" : "ai-message-tab"}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-              {"badge" in tab && tab.badge ? <span className="ai-message-tab-badge">{tab.badge}</span> : null}
-            </button>
-          ))}
+          <button type="button" className="ai-message-tab ai-message-tab-active">
+            消息中心
+            <span className="ai-message-tab-badge">{messages.filter((item) => !item.read).length}</span>
+          </button>
         </div>
 
         <div className="ai-message-toolbar">
@@ -146,13 +106,13 @@ export function MessageCenter({
                 <th>消息报文</th>
                 <th>算法名称</th>
                 <th>相关设备</th>
-                <th>巡检抓图</th>
+                <th>巡检抓拍</th>
                 <th>消息推送时间</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              {visibleMessages.map((message, index) => (
+              {filteredMessages.map((message, index) => (
                 <tr key={message.id}>
                   <td>
                     <input
@@ -174,10 +134,7 @@ export function MessageCenter({
                     <div className="ai-message-desc">{message.description}</div>
                   </td>
                   <td>{message.algorithmId}</td>
-                  <td>
-                    <div className="ai-device-title">门口监控</div>
-                    <div className="ai-device-group">分组：科技园店 / 南山区 / 库迪咖啡</div>
-                  </td>
+                  <td>{message.qrCode}</td>
                   <td>
                     {message.imageUrl ? (
                       <div className="ai-message-thumb">
@@ -215,21 +172,6 @@ export function MessageCenter({
             </tbody>
           </table>
         </div>
-
-        <div className="ai-pagination-row">
-          <span>共计 X 条 第 1/1 页 已读：X</span>
-          <div className="ai-pagination-controls">
-            <select className="ai-input ai-input-select ai-pagination-select">
-              <option>X条/页</option>
-            </select>
-            <button type="button">&lt;</button>
-            <span className="ai-pagination-current">1</span>
-            <button type="button">&gt;</button>
-            <button type="button">前往第</button>
-            <input className="ai-input ai-pagination-input" defaultValue="1" />
-            <span>页</span>
-          </div>
-        </div>
       </section>
 
       {filterOpen ? (
@@ -244,32 +186,29 @@ export function MessageCenter({
             <div className="ai-message-drawer-section">
               <label className="ai-mini-form">
                 <span>日期</span>
-                <input
-                  className="ai-input"
-                  placeholder="例如 2026-03-11"
-                  value={filterState.day}
-                  onChange={(event) => setFilterState((current) => ({ ...current, day: event.target.value }))}
-                />
+                <input className="ai-input" type="date" value={filterState.day} onChange={(event) => setFilterState((current) => ({ ...current, day: event.target.value }))} />
               </label>
               <label className="ai-mini-form">
                 <span>时刻</span>
-                <input
-                  className="ai-input"
-                  placeholder="例如 08"
-                  value={filterState.hour}
-                  onChange={(event) => setFilterState((current) => ({ ...current, hour: event.target.value }))}
-                />
+                <input className="ai-input" type="number" min="0" max="23" value={filterState.hour} onChange={(event) => setFilterState((current) => ({ ...current, hour: event.target.value }))} />
               </label>
               <label className="ai-mini-form">
                 <span>状态</span>
-                <select
-                  className="ai-input ai-input-select"
-                  value={filterState.status}
-                  onChange={(event) => setFilterState((current) => ({ ...current, status: event.target.value }))}
-                >
+                <select className="ai-input ai-input-select" value={filterState.status} onChange={(event) => setFilterState((current) => ({ ...current, status: event.target.value }))}>
                   <option value="all">全部状态</option>
                   <option value="unread">仅未读</option>
                   <option value="read">仅已读</option>
+                </select>
+              </label>
+              <label className="ai-mini-form">
+                <span>消息类型</span>
+                <select className="ai-input ai-input-select" value={filterState.type} onChange={(event) => setFilterState((current) => ({ ...current, type: event.target.value }))}>
+                  <option value="all">全部类型</option>
+                  {messageTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -278,7 +217,7 @@ export function MessageCenter({
                 type="button"
                 className="ai-button ai-button-light"
                 onClick={() => {
-                  setFilterState({ status: "all", day: "", hour: "" });
+                  setFilterState({ status: "all", day: "", hour: "", type: "all" });
                   setFilterOpen(false);
                 }}
               >
@@ -305,9 +244,9 @@ export function MessageCenter({
             <div className="ai-message-drawer-section">
               <dl className="ai-message-detail-grid">
                 <dt>消息类型</dt>
-                <dd>离岗检测</dd>
+                <dd>{selectedMessage.type}</dd>
                 <dt>消息内容</dt>
-                <dd>检测空岗</dd>
+                <dd>{selectedMessage.description}</dd>
                 <dt>消息推送时间</dt>
                 <dd>{formatDateTime(selectedMessage.createdAt)}</dd>
               </dl>
@@ -319,53 +258,44 @@ export function MessageCenter({
                 <dt>任务名称</dt>
                 <dd>{selectedMessage.title}</dd>
                 <dt>设备名称</dt>
-                <dd>门口监控</dd>
-                <dt>设备分组</dt>
-                <dd>科技园店 / 南山区 / 库迪咖啡</dd>
-                <dt>巡检时间</dt>
-                <dd>每天，08:00、10:00、15:00、23:00 各巡检一次</dd>
-                <dt>消息提醒</dt>
-                <dd>{selectedMessage.description}</dd>
+                <dd>{selectedMessage.qrCode}</dd>
+                <dt>算法名称</dt>
+                <dd>{selectedMessage.algorithmId}</dd>
               </dl>
             </div>
 
             <div className="ai-message-drawer-section ai-message-drawer-result">
               <h3>巡检结果</h3>
               <dl className="ai-message-detail-grid">
-                <dt>算法名称</dt>
-                <dd>{selectedMessage.algorithmId}</dd>
                 <dt>检测结果</dt>
-                <dd className="ai-danger-text">不合格</dd>
-                <dt>设备抓图</dt>
+                <dd className="ai-danger-text">{selectedMessage.result === "UNQUALIFIED" ? "不合格" : "合格"}</dd>
+                <dt>抓拍</dt>
                 <dd />
               </dl>
 
-              {mediaByMessage[selectedMessage.id]?.[0] ? (
-                <>
-                  <div className="ai-drawer-media">
-                    <Image src={mediaByMessage[selectedMessage.id][0].url} alt={selectedMessage.title} fill sizes="432px" />
-                  </div>
-                  <button type="button" className="ai-button ai-button-light">
-                    查看回放
-                  </button>
-                </>
+              {imageMedia?.url || selectedMessage.imageUrl ? (
+                <div className="ai-drawer-media">
+                  <Image src={imageMedia?.url ?? selectedMessage.imageUrl!} alt={selectedMessage.title} fill sizes="432px" />
+                </div>
+              ) : null}
+
+              {videoMedia ? (
+                <Link href={`/api/media/${videoMedia.id}`} className="ai-button ai-button-light" target="_blank">
+                  查看回放
+                </Link>
               ) : (
                 <div className="ai-video-empty">暂无可查看录像</div>
               )}
             </div>
 
             <div className="ai-drawer-nav">
-              <button
-                type="button"
-                disabled={selectedIndex <= 0}
-                onClick={() => setSelectedId(visibleMessages[selectedIndex - 1]?.id ?? "")}
-              >
+              <button type="button" disabled={selectedIndex <= 0} onClick={() => setSelectedId(filteredMessages[selectedIndex - 1]?.id ?? "")}>
                 &lt; 上一个
               </button>
               <button
                 type="button"
-                disabled={selectedIndex === -1 || selectedIndex >= visibleMessages.length - 1}
-                onClick={() => setSelectedId(visibleMessages[selectedIndex + 1]?.id ?? "")}
+                disabled={selectedIndex === -1 || selectedIndex >= filteredMessages.length - 1}
+                onClick={() => setSelectedId(filteredMessages[selectedIndex + 1]?.id ?? "")}
               >
                 下一个 &gt;
               </button>

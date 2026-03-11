@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { executeTask } from "@/lib/domain/tasks";
+import { refreshTaskResults } from "@/lib/domain/tasks";
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
   try {
-    const execution = await executeTask(params.id);
+    const execution = await refreshTaskResults(params.id);
     return NextResponse.json(execution);
   } catch (error) {
     return NextResponse.json(
@@ -14,4 +14,3 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     );
   }
 }
-

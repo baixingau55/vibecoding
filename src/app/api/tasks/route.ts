@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     algorithmVersions: body.algorithmVersions ?? {},
     devices: body.devices ?? [],
     schedules: body.schedules ?? [],
+    inspectionRule: body.inspectionRule ?? { resultMode: "detect_target" },
     messageRule: body.messageRule ?? { enabled: true, triggerMode: "every_unqualified", continuousCount: 3 },
     regionsByQrCode: body.regionsByQrCode ?? {}
   });

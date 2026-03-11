@@ -8,6 +8,5 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
   if (!media) {
     return NextResponse.json({ error: "Media not found" }, { status: 404 });
   }
-  return NextResponse.json({ media });
+  return NextResponse.redirect(media.url, { status: 302 });
 }
-
