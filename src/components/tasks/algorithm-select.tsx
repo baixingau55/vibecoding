@@ -1,89 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronDown, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Search } from "lucide-react";
 
 import type { Algorithm } from "@/lib/types";
 
-const categories = [
-  "通用安防",
-  "连锁企业",
-  "社区园区",
-  "数字乡村",
-  "交通运输",
-  "应急管理",
-  "交警行业",
-  "公安行业",
-  "城管市政",
-  "水利水务",
-  "能源治金"
-];
-
-const usagePalette = ["2363475", "236475", "1636475", "6475"];
-
-function getDisplayCardId(baseId: string, index: number) {
-  return `${baseId}__display_${index}`;
-}
-
-function getBaseAlgorithmId(displayId: string) {
-  const marker = "__display_";
-  const markerIndex = displayId.indexOf(marker);
-  return markerIndex === -1 ? displayId : displayId.slice(0, markerIndex);
+function normalizeCategoryName(name: string) {
+  return name.trim() || "未分类";
 }
 
 export function AlgorithmSelect({ algorithms }: { algorithms: Algorithm[] }) {
   const router = useRouter();
+  const categoryBarRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"standard" | "custom">("standard");
-  const [category, setCategory] = useState("通用安防");
+  const [category, setCategory] = useState("全部");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string>(algorithms[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState<string>("");
 
-  const displayAlgorithms = useMemo(() => {
-    const baseList =
-      algorithms.length > 0
-        ? algorithms
-        : [
-            {
-              id: "placeholder",
-              name: "口罩检测",
-              introduction: "通过摄像头实时监测指定区域内的工作人员是否存在离岗行为算法介绍内容算法介绍内容算法介绍内容算法介绍内容算法介绍内容",
-              latestVersion: "1.1",
-              versionList: ["1.1"],
-              categories: ["通用安防"],
-              active: true,
-              source: "mock" as const
-            }
-          ];
+  const categories = useMemo(() => {
+    const fromAlgorithms = Array.from(new Set(algorithms.flatMap((item) => item.categories.map(normalizeCategoryName))));
+    return ["全部", ...fromAlgorithms];
+  }, [algorithms]);
 
-    const filtered = mode === "custom"
-      ? []
-      : baseList.filter((item) => {
-          if (query.trim() && !item.name.includes(query.trim())) {
-            return false;
-          }
+  const visibleAlgorithms = useMemo(() => {
+    if (mode !== "standard") return [];
 
-          if (category === "通用安防") {
-            return true;
-          }
+    return algorithms.filter((algorithm) => {
+      if (query.trim()) {
+        const keyword = query.trim();
+        if (!algorithm.name.includes(keyword) && !algorithm.introduction.includes(keyword) && !algorithm.id.includes(keyword)) {
+          return false;
+        }
+      }
 
-          return item.categories.length === 0 || item.categories.includes(category);
-        });
+      if (category === "全部") {
+        return true;
+      }
 
-    const seeded = filtered.length > 0 ? filtered : baseList.slice(0, 1);
-
-    return Array.from({ length: 12 }, (_, index) => {
-      const seed = seeded[index % seeded.length];
-      return {
-        ...seed,
-        id: getDisplayCardId(seed.id, index),
-        usage: usagePalette[index % usagePalette.length]
-      };
+      return algorithm.categories.map(normalizeCategoryName).includes(category);
     });
   }, [algorithms, category, mode, query]);
 
-  const selectedBaseId = getBaseAlgorithmId(selectedId);
+  function scrollCategoryBar(direction: "left" | "right") {
+    categoryBarRef.current?.scrollBy({
+      left: direction === "left" ? -360 : 360,
+      behavior: "smooth"
+    });
+  }
 
   return (
     <section className="ai-algorithm-page">
@@ -120,31 +85,37 @@ export function AlgorithmSelect({ algorithms }: { algorithms: Algorithm[] }) {
 
       {mode === "standard" ? (
         <>
-          <div className="ai-algorithm-category-bar">
-            {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={item === category ? "ai-algorithm-category ai-algorithm-category-active" : "ai-algorithm-category"}
-                onClick={() => setCategory(item)}
-              >
-                {item}
-              </button>
-            ))}
+          <div className="ai-algorithm-category-strip">
+            <button type="button" className="ai-algorithm-category-scroll" onClick={() => scrollCategoryBar("left")} aria-label="向左滚动分类">
+              <ArrowLeft size={16} strokeWidth={1.8} />
+            </button>
+            <div className="ai-algorithm-category-bar" ref={categoryBarRef}>
+              {categories.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={item === category ? "ai-algorithm-category ai-algorithm-category-active" : "ai-algorithm-category"}
+                  onClick={() => setCategory(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="ai-algorithm-category-scroll" onClick={() => scrollCategoryBar("right")} aria-label="向右滚动分类">
+              <ArrowRight size={16} strokeWidth={1.8} />
+            </button>
           </div>
 
-          <div className="ai-algorithm-card-grid">
-            {displayAlgorithms.map((algorithm, index) => {
-              const active = selectedBaseId === getBaseAlgorithmId(algorithm.id);
-
-              return (
+          {visibleAlgorithms.length > 0 ? (
+            <div className="ai-algorithm-card-grid">
+              {visibleAlgorithms.map((algorithm) => (
                 <button
                   key={algorithm.id}
                   type="button"
-                  className={active ? "ai-algorithm-tile ai-algorithm-tile-active" : "ai-algorithm-tile"}
+                  className={selectedId === algorithm.id ? "ai-algorithm-tile ai-algorithm-tile-active" : "ai-algorithm-tile"}
                   onClick={() => {
                     setSelectedId(algorithm.id);
-                    router.push(`/tasks/new?algorithmId=${getBaseAlgorithmId(algorithm.id)}`);
+                    router.push(`/tasks/new?algorithmId=${algorithm.id}`);
                   }}
                 >
                   <div className="ai-algorithm-tile-title-row">
@@ -152,26 +123,28 @@ export function AlgorithmSelect({ algorithms }: { algorithms: Algorithm[] }) {
                       <strong>{algorithm.name}</strong>
                       <span className="ai-algorithm-tile-version">v{algorithm.latestVersion}</span>
                     </div>
-                    <div className="ai-algorithm-tile-usage">
-                      <span>累计使用</span>
-                      <em>{algorithm.usage}</em>
-                      <span>次</span>
-                    </div>
                   </div>
                   <p>{algorithm.introduction}</p>
                   <span className="ai-algorithm-tile-link">
                     添加巡检任务 <ArrowRight size={16} strokeWidth={2} />
                   </span>
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <section className="ai-custom-page-state">
+              <div className="ai-custom-page-panel">
+                <h2>暂无可用标准算法</h2>
+                <p>当前未从 TP-LINK 开放接口获取到算法列表，请检查 AK/SK 是否有效以及接口权限是否已开通。</p>
+              </div>
+            </section>
+          )}
         </>
       ) : (
         <section className="ai-custom-page-state">
           <div className="ai-custom-page-panel">
             <h2>自定义算法</h2>
-            <p>首期仅保留入口展示。后续接入真实算法管理能力后，可在这里新增和维护自定义算法。</p>
+            <p>首期仅保留入口展示，后续接入真实算法管理能力后，可在这里新增和维护自定义算法。</p>
             <button type="button" className="ai-custom-page-button" disabled>
               创建自定义算法
             </button>
@@ -184,7 +157,7 @@ export function AlgorithmSelect({ algorithms }: { algorithms: Algorithm[] }) {
           type="button"
           className="ai-algorithm-primary"
           disabled={mode !== "standard" || !selectedId}
-          onClick={() => router.push(`/tasks/new?algorithmId=${selectedBaseId}`)}
+          onClick={() => router.push(`/tasks/new?algorithmId=${selectedId}`)}
         >
           进入任务配置
         </button>

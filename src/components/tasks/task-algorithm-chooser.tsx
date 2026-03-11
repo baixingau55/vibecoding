@@ -1,24 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, X } from "lucide-react";
 
 import type { Algorithm } from "@/lib/types";
 
-const categories = [
-  "通用安防",
-  "连锁企业",
-  "社区园区",
-  "数字乡村",
-  "交通运输",
-  "应急管理",
-  "交警行业",
-  "公安行业",
-  "城管市政",
-  "水利水务",
-  "能源治金"
-];
+function normalizeCategoryName(name: string) {
+  return name.trim() || "未分类";
+}
 
 export function TaskAlgorithmChooser({
   algorithms,
@@ -28,28 +18,42 @@ export function TaskAlgorithmChooser({
   returnPath?: string;
 }) {
   const router = useRouter();
+  const categoryBarRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"standard" | "custom">("standard");
-  const [category, setCategory] = useState("通用安防");
+  const [category, setCategory] = useState("全部");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
 
+  const categories = useMemo(() => {
+    const fromAlgorithms = Array.from(new Set(algorithms.flatMap((item) => item.categories.map(normalizeCategoryName))));
+    return ["全部", ...fromAlgorithms];
+  }, [algorithms]);
+
   const visibleAlgorithms = useMemo(() => {
-    const filtered = algorithms.filter((algorithm) => {
-      if (query.trim() && !algorithm.name.includes(query.trim())) {
-        return false;
+    if (mode !== "standard") return [];
+
+    return algorithms.filter((algorithm) => {
+      if (query.trim()) {
+        const keyword = query.trim();
+        if (!algorithm.name.includes(keyword) && !algorithm.introduction.includes(keyword) && !algorithm.id.includes(keyword)) {
+          return false;
+        }
       }
 
-      if (category === "通用安防") {
+      if (category === "全部") {
         return true;
       }
 
-      return algorithm.categories.length === 0 || algorithm.categories.includes(category);
+      return algorithm.categories.map(normalizeCategoryName).includes(category);
     });
+  }, [algorithms, category, mode, query]);
 
-    const seeded = filtered.length > 0 ? filtered : algorithms;
-
-    return Array.from({ length: Math.max(6, seeded.length) }, (_, index) => seeded[index % seeded.length]);
-  }, [algorithms, category, query]);
+  function scrollCategoryBar(direction: "left" | "right") {
+    categoryBarRef.current?.scrollBy({
+      left: direction === "left" ? -240 : 240,
+      behavior: "smooth"
+    });
+  }
 
   return (
     <section className="ai-chooser-page">
@@ -91,35 +95,47 @@ export function TaskAlgorithmChooser({
 
         {mode === "standard" ? (
           <>
-            <div className="ai-chooser-category-bar">
-              {categories.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={item === category ? "ai-chooser-category ai-chooser-category-active" : "ai-chooser-category"}
-                  onClick={() => setCategory(item)}
-                >
-                  {item}
-                </button>
-              ))}
+            <div className="ai-chooser-category-strip">
+              <button type="button" className="ai-chooser-category-scroll" onClick={() => scrollCategoryBar("left")} aria-label="向左滚动分类">
+                <ArrowLeft size={14} strokeWidth={1.8} />
+              </button>
+              <div className="ai-chooser-category-bar" ref={categoryBarRef}>
+                {categories.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={item === category ? "ai-chooser-category ai-chooser-category-active" : "ai-chooser-category"}
+                    onClick={() => setCategory(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="ai-chooser-category-scroll" onClick={() => scrollCategoryBar("right")} aria-label="向右滚动分类">
+                <ArrowRight size={14} strokeWidth={1.8} />
+              </button>
             </div>
 
-            <div className="ai-chooser-grid">
-              {visibleAlgorithms.slice(0, 6).map((algorithm, index) => (
-                <button
-                  key={`${algorithm.id}-${index}`}
-                  type="button"
-                  className={selectedId === algorithm.id ? "ai-chooser-card ai-chooser-card-active" : "ai-chooser-card"}
-                  onClick={() => setSelectedId(algorithm.id)}
-                >
-                  <div className="ai-chooser-card-title">
-                    <strong>{algorithm.name}</strong>
-                    <span>v1.1</span>
-                  </div>
-                  <p>{algorithm.introduction}</p>
-                </button>
-              ))}
-            </div>
+            {visibleAlgorithms.length > 0 ? (
+              <div className="ai-chooser-grid">
+                {visibleAlgorithms.map((algorithm) => (
+                  <button
+                    key={algorithm.id}
+                    type="button"
+                    className={selectedId === algorithm.id ? "ai-chooser-card ai-chooser-card-active" : "ai-chooser-card"}
+                    onClick={() => setSelectedId(algorithm.id)}
+                  >
+                    <div className="ai-chooser-card-title">
+                      <strong>{algorithm.name}</strong>
+                      <span>v{algorithm.latestVersion}</span>
+                    </div>
+                    <p>{algorithm.introduction}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="ai-chooser-empty">当前未获取到可用标准算法，请检查 TP-LINK 接口权限或凭证。</div>
+            )}
           </>
         ) : (
           <div className="ai-chooser-empty">首期仅保留自定义算法入口展示。</div>

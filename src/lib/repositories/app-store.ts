@@ -89,6 +89,19 @@ async function loadDevices(taskDevices: DeviceRef[]) {
     }
   }
 
+  for (const qrCode of DEFAULT_DEVICE_QR_CODES) {
+    if (!merged.has(qrCode)) {
+      merged.set(qrCode, {
+        qrCode,
+        channelId: 1,
+        name: `TP-LINK Device ${qrCode.slice(-4)}`,
+        status: "online",
+        groupName: "默认设备分组",
+        previewImage: "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80"
+      });
+    }
+  }
+
   return Array.from(merged.values());
 }
 

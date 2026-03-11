@@ -1,4 +1,3 @@
-import { createMockSnapshot } from "@/lib/mock-data";
 import { fetchTpLinkAlgorithms } from "@/lib/tplink/client";
 
 export async function getAlgorithms() {
@@ -6,9 +5,8 @@ export async function getAlgorithms() {
     const algorithms = await fetchTpLinkAlgorithms();
     if (algorithms.length > 0) return algorithms;
   } catch {
-    // Fall back to the local seeded algorithms so the project remains usable offline.
+    // Return an empty list when TP-LINK credentials or permissions are invalid.
   }
 
-  return createMockSnapshot().algorithms;
+  return [];
 }
-

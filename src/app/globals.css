@@ -2662,6 +2662,24 @@ button {
   overflow-x: auto;
 }
 
+.ai-algorithm-category-strip {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: end;
+}
+
+.ai-algorithm-category-scroll {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #666;
+}
+
+.ai-algorithm-category-scroll:hover {
+  color: #1a1a1a;
+}
+
 .ai-algorithm-category {
   position: relative;
   flex: none;
@@ -3046,6 +3064,24 @@ button {
   padding: 0 18px 10px;
   border-bottom: 1px solid #eceff4;
   overflow-x: auto;
+}
+
+.ai-chooser-category-strip {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: end;
+}
+
+.ai-chooser-category-scroll {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: #666;
+}
+
+.ai-chooser-category-scroll:hover {
+  color: #1a1a1a;
 }
 
 .ai-chooser-category {
