@@ -1,0 +1,2853 @@
+{
+  "pageName": "巡检任务",
+  "pageObjectID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+  "name": "任务详情_05任务执行日志_01",
+  "slug": "巡检任务-10-任务详情_05任务执行日志_01",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#f0f3faff",
+  "imagePath": "preview/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-10-%E4%BB%BB%E5%8A%A1%E8%AF%A6%E6%83%85_05%E4%BB%BB%E5%8A%A1%E6%89%A7%E8%A1%8C%E6%97%A5%E5%BF%97_01.png",
+  "imageIconPath": "preview/icons/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-10-%E4%BB%BB%E5%8A%A1%E8%AF%A6%E6%83%85_05%E4%BB%BB%E5%8A%A1%E6%89%A7%E8%A1%8C%E6%97%A5%E5%BF%97_01.png",
+  "layers": [
+    {
+      "objectID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "parentID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+      "name": "任务详情_05任务执行日志_01",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "B7771685-1DE7-48B6-A831-78BA82374258",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "矩形",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "50D848CB-71B4-402D-9DE5-98A8540D2234",
+      "symbolName": "_Other Resources/Shape形状/Light/Drawer",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "0. Elements元素/Shape形状/Light/Drawer",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "55BF944E-58BD-48B4-9763-33EF1CA1BB0C",
+      "parentID": "50D848CB-71B4-402D-9DE5-98A8540D2234",
+      "name": "Rectangle 20",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "shadows": [
+        {
+          "offsetX": 0,
+          "offsetY": 12,
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "blurRadius": 48
+        }
+      ]
+    },
+    {
+      "objectID": "AE458992-CA09-4F3B-8FC4-0D48A1D1C93C",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/x/Light/Head",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Modules/Dialogs/_Head_Title备份 2",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "5C336269-ECC4-4C78-9C99-A96DD8F25B87",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "AE458992-CA09-4F3B-8FC4-0D48A1D1C93C",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "7B22CEFD-BA01-4D15-AC43-11ECF0C83FD3",
+      "parentID": "5C336269-ECC4-4C78-9C99-A96DD8F25B87",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "E5892CD2-5FFB-4951-8504-58C5F95E859A",
+      "parentID": "5C336269-ECC4-4C78-9C99-A96DD8F25B87",
+      "name": "Line",
+      "rect": {
+        "x": 480,
+        "y": 259,
+        "width": 960,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "3B587764-043C-4037-9803-E9479741FF8D",
+      "parentID": "AE458992-CA09-4F3B-8FC4-0D48A1D1C93C",
+      "name": "icon/Common/Close",
+      "rect": {
+        "x": 1400,
+        "y": 232,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Common通用/x.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "25F7DECC-5EB5-4BB3-B087-B983C6FFE1BF",
+      "parentID": "AE458992-CA09-4F3B-8FC4-0D48A1D1C93C",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 504,
+        "y": 230,
+        "width": 888,
+        "height": 20
+      },
+      "type": "text",
+      "content": "任务执⾏⽇志",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 8,
+      "fontFamily": "PingFangSC-Semibold",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    },
+    {
+      "objectID": "E6E6A191-C6E4-4F32-AEE7-7FD91A2BB16A",
+      "symbolName": "4. Views数据展示/Table表格/Head/Light/Text_left",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Head备份 3",
+      "rect": {
+        "x": 504,
+        "y": 284,
+        "width": 64,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "4027ACFB-ACDB-4E19-A2D2-6261B3674C1C",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Top+Bottom",
+      "parentID": "E6E6A191-C6E4-4F32-AEE7-7FD91A2BB16A",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 284,
+        "width": 64,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "4BD0E6F5-6887-4416-B627-707A4F8F4DCF",
+      "parentID": "4027ACFB-ACDB-4E19-A2D2-6261B3674C1C",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 284,
+        "width": 64,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 242,
+              "g": 242,
+              "b": 242
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "7791E737-2E4F-4A3E-9094-E06B5D9F5523",
+      "parentID": "4027ACFB-ACDB-4E19-A2D2-6261B3674C1C",
+      "name": "Line_bottom",
+      "rect": {
+        "x": 504,
+        "y": 323,
+        "width": 64,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0796D038-EA0E-4FB8-A2AD-C07116285BD5",
+      "parentID": "4027ACFB-ACDB-4E19-A2D2-6261B3674C1C",
+      "name": "Line_top",
+      "rect": {
+        "x": 504,
+        "y": 284,
+        "width": 64,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0AD9835C-A612-4B38-A667-F2DACABD6224",
+      "parentID": "E6E6A191-C6E4-4F32-AEE7-7FD91A2BB16A",
+      "name": "Content",
+      "rect": {
+        "x": 512,
+        "y": 295,
+        "width": 24,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "F5BC5D30-3433-43F3-9C6B-ADABD5AA36B1",
+      "parentID": "0AD9835C-A612-4B38-A667-F2DACABD6224",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 512,
+        "y": 295,
+        "width": 24,
+        "height": 18
+      },
+      "type": "text",
+      "content": "序号",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "7E9DE413-0D0F-4060-9B4B-9C8FE3ED1DBA",
+      "symbolName": "4. Views数据展示/Table表格/Head/Light/Text_left",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Head备份 4",
+      "rect": {
+        "x": 568,
+        "y": 284,
+        "width": 367.9999999999999,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "85184F50-036E-4530-B533-4E6507B97A59",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Top+Bottom",
+      "parentID": "7E9DE413-0D0F-4060-9B4B-9C8FE3ED1DBA",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 284,
+        "width": 367.9999999999999,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "4C1D0F16-55A4-452A-8921-FF812433B2DA",
+      "parentID": "85184F50-036E-4530-B533-4E6507B97A59",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 284,
+        "width": 367.9999999999999,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 242,
+              "g": 242,
+              "b": 242
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "A3DA7A1D-5F8D-409D-B741-119E69A6B8DC",
+      "parentID": "85184F50-036E-4530-B533-4E6507B97A59",
+      "name": "Line_bottom",
+      "rect": {
+        "x": 568,
+        "y": 323,
+        "width": 367.9999999999999,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "89206C96-61C7-4C48-A3A7-A3264A1DBC61",
+      "parentID": "85184F50-036E-4530-B533-4E6507B97A59",
+      "name": "Line_top",
+      "rect": {
+        "x": 568,
+        "y": 284,
+        "width": 367.9999999999999,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0D3FF95B-820E-4EC9-9C1B-FC4D05802B3D",
+      "parentID": "7E9DE413-0D0F-4060-9B4B-9C8FE3ED1DBA",
+      "name": "Content",
+      "rect": {
+        "x": 576,
+        "y": 295,
+        "width": 68,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "0E5B567B-81A1-462B-99D2-6148A239C0DA",
+      "parentID": "0D3FF95B-820E-4EC9-9C1B-FC4D05802B3D",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 576,
+        "y": 295,
+        "width": 48,
+        "height": 18
+      },
+      "type": "text",
+      "content": "巡检时间",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "392D050E-5E59-4495-AA99-39B211AA7A83",
+      "parentID": "0D3FF95B-820E-4EC9-9C1B-FC4D05802B3D",
+      "name": "icon/Common/gradedown",
+      "rect": {
+        "x": 628,
+        "y": 296,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 153,
+              "g": 153,
+              "b": 153
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/sort_down.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "E506AB47-8DA8-4270-B9E7-287302A849D3",
+      "symbolName": "4. Views数据展示/Table表格/Head/Light/Text_left",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Head备份 5",
+      "rect": {
+        "x": 936,
+        "y": 284,
+        "width": 320,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "C928C550-ACD6-4829-AB9A-675AD1DAB8DB",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Top+Bottom",
+      "parentID": "E506AB47-8DA8-4270-B9E7-287302A849D3",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 284,
+        "width": 320,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "24098AE1-8382-41E8-B957-C70763823A84",
+      "parentID": "C928C550-ACD6-4829-AB9A-675AD1DAB8DB",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 284,
+        "width": 320,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 242,
+              "g": 242,
+              "b": 242
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "4DDF64E4-170F-4C29-AF40-E00EC6439B35",
+      "parentID": "C928C550-ACD6-4829-AB9A-675AD1DAB8DB",
+      "name": "Line_bottom",
+      "rect": {
+        "x": 936,
+        "y": 323,
+        "width": 320,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0E101B4D-867B-4A13-8488-4A4DFE00F470",
+      "parentID": "C928C550-ACD6-4829-AB9A-675AD1DAB8DB",
+      "name": "Line_top",
+      "rect": {
+        "x": 936,
+        "y": 284,
+        "width": 320,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "59A8C0A5-3BD7-4F92-89ED-1BAAF5901842",
+      "parentID": "E506AB47-8DA8-4270-B9E7-287302A849D3",
+      "name": "Content",
+      "rect": {
+        "x": 944,
+        "y": 295,
+        "width": 52,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "F9501778-2FB9-445A-9B81-7D14F752DE93",
+      "parentID": "59A8C0A5-3BD7-4F92-89ED-1BAAF5901842",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 944,
+        "y": 295,
+        "width": 52,
+        "height": 18
+      },
+      "type": "text",
+      "content": "执⾏状态 ",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "9AFB7289-D529-421C-9128-B7AC464BB922",
+      "symbolName": "4. Views数据展示/Table表格/Head/Light/Text_left",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Head备份 7",
+      "rect": {
+        "x": 1256,
+        "y": 284,
+        "width": 160,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "72EEA754-E30E-4B2A-B071-3DFECEAF72F8",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Top+Bottom",
+      "parentID": "9AFB7289-D529-421C-9128-B7AC464BB922",
+      "name": "BG",
+      "rect": {
+        "x": 1256,
+        "y": 284,
+        "width": 160,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "EC8C53BD-53AE-4AD4-ABC5-7DDD69B03A0F",
+      "parentID": "72EEA754-E30E-4B2A-B071-3DFECEAF72F8",
+      "name": "BG",
+      "rect": {
+        "x": 1256,
+        "y": 284,
+        "width": 160,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 242,
+              "g": 242,
+              "b": 242
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "94890350-1A3A-4E63-B71B-07F84F58E005",
+      "parentID": "72EEA754-E30E-4B2A-B071-3DFECEAF72F8",
+      "name": "Line_bottom",
+      "rect": {
+        "x": 1256,
+        "y": 323,
+        "width": 160,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "198782ED-D815-46D6-980D-1445C3DF05E4",
+      "parentID": "72EEA754-E30E-4B2A-B071-3DFECEAF72F8",
+      "name": "Line_top",
+      "rect": {
+        "x": 1256,
+        "y": 284,
+        "width": 160,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "B7102CBB-EA1A-46AE-8CB0-3CF133E4D883",
+      "parentID": "9AFB7289-D529-421C-9128-B7AC464BB922",
+      "name": "Content",
+      "rect": {
+        "x": 1264,
+        "y": 295,
+        "width": 60,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "B73DD25D-2DE3-4461-8C04-CFF956BC6221",
+      "parentID": "B7102CBB-EA1A-46AE-8CB0-3CF133E4D883",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 1264,
+        "y": 295,
+        "width": 60,
+        "height": 18
+      },
+      "type": "text",
+      "content": "总检测次数",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "C9D628AC-67DF-4302-A0FD-8E167F75F824",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 5",
+      "rect": {
+        "x": 504,
+        "y": 324,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "5C34F6DC-8038-4333-ACCB-66B29FEB2A43",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "C9D628AC-67DF-4302-A0FD-8E167F75F824",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 324,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "303ACA59-D9AD-4550-BD00-2A49993879E1",
+      "parentID": "5C34F6DC-8038-4333-ACCB-66B29FEB2A43",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 324,
+        "width": 64,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "03C56B21-2A62-45BF-82C5-3DB27FEE986C",
+      "parentID": "5C34F6DC-8038-4333-ACCB-66B29FEB2A43",
+      "name": "Line",
+      "rect": {
+        "x": 504,
+        "y": 371,
+        "width": 64,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "82C4F6B0-FD66-4A1B-AD6B-0440C58771E3",
+      "parentID": "C9D628AC-67DF-4302-A0FD-8E167F75F824",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 512,
+        "y": 339,
+        "width": 48,
+        "height": 18
+      },
+      "type": "text",
+      "content": "1",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "39FEEE32-4F34-4C4E-A67D-E9395724930C",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 6",
+      "rect": {
+        "x": 568,
+        "y": 324,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "8E4ABFB7-A18F-4596-A66A-B085F4D6C399",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "39FEEE32-4F34-4C4E-A67D-E9395724930C",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 324,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "D512344E-14A1-47C0-A99B-63E5117B73DC",
+      "parentID": "8E4ABFB7-A18F-4596-A66A-B085F4D6C399",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 324,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "2C89CD0B-5B2C-454B-83B8-3E53AA5F4E46",
+      "parentID": "8E4ABFB7-A18F-4596-A66A-B085F4D6C399",
+      "name": "Line",
+      "rect": {
+        "x": 568,
+        "y": 371,
+        "width": 367.9999999999999,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "19992B02-1231-4D1E-A120-5D4E2A86608E",
+      "parentID": "39FEEE32-4F34-4C4E-A67D-E9395724930C",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 576,
+        "y": 339,
+        "width": 351.9999999999999,
+        "height": 18
+      },
+      "type": "text",
+      "content": "YYYY-MM-DD HH:MM:SS～YYYY-MM-DD HH:MM:SS",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "C0727C4F-2E6B-4EFC-9BC5-8B623F79418B",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Process+Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 7",
+      "rect": {
+        "x": 936,
+        "y": 324,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "F90C3999-3BE6-45C4-9296-65BDFE6624A5",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "C0727C4F-2E6B-4EFC-9BC5-8B623F79418B",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 324,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "CF2F3B32-058C-49CB-BDEE-79A6BAF740EA",
+      "parentID": "F90C3999-3BE6-45C4-9296-65BDFE6624A5",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 324,
+        "width": 320,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "AB23D527-97EB-412C-8C66-C6CB5E3CE96B",
+      "parentID": "F90C3999-3BE6-45C4-9296-65BDFE6624A5",
+      "name": "Line",
+      "rect": {
+        "x": 936,
+        "y": 371,
+        "width": 320,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "7913F8B4-FC97-48D4-9525-5A10847AD3F0",
+      "parentID": "C0727C4F-2E6B-4EFC-9BC5-8B623F79418B",
+      "name": "编组",
+      "rect": {
+        "x": 944,
+        "y": 335,
+        "width": 280,
+        "height": 26
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "2D003D0B-3DEF-4357-8B90-576073CAB929",
+      "symbolName": "4. Views数据展示/Process进程/Light/Default",
+      "parentID": "7913F8B4-FC97-48D4-9525-5A10847AD3F0",
+      "name": "Process",
+      "rect": {
+        "x": 944,
+        "y": 357,
+        "width": 280,
+        "height": 4
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "31877C35-D6CD-4462-8364-0FADF4C8C6D5",
+      "parentID": "2D003D0B-3DEF-4357-8B90-576073CAB929",
+      "name": "BG",
+      "rect": {
+        "x": 944,
+        "y": 357,
+        "width": 280,
+        "height": 4
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "EF9701B5-5DCC-4860-B64E-15146834B52E",
+      "parentID": "2D003D0B-3DEF-4357-8B90-576073CAB929",
+      "name": "Progress",
+      "rect": {
+        "x": 944,
+        "y": 357,
+        "width": 143,
+        "height": 4
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 23,
+              "g": 133,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "DDE7F8E2-53C9-4709-AD8C-C42E0606690B",
+      "parentID": "7913F8B4-FC97-48D4-9525-5A10847AD3F0",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 944,
+        "y": 335,
+        "width": 280,
+        "height": 18
+      },
+      "type": "text",
+      "content": "巡检中",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "D5CBA217-2519-40E4-AC63-DA4C9CDC79B7",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text Button_2",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 9",
+      "rect": {
+        "x": 1256,
+        "y": 324,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "40CA8085-F49B-46B5-91BA-B86B98044A3C",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "D5CBA217-2519-40E4-AC63-DA4C9CDC79B7",
+      "name": "_Other Resources/Shape/Table/Body",
+      "rect": {
+        "x": 1256,
+        "y": 324,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "88800AEC-1FD7-425C-A4FE-4BF1F08A1E24",
+      "parentID": "40CA8085-F49B-46B5-91BA-B86B98044A3C",
+      "name": "BG",
+      "rect": {
+        "x": 1256,
+        "y": 324,
+        "width": 160,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "E7CACA8B-5A75-4B8E-B7A5-6FB5250DB488",
+      "parentID": "40CA8085-F49B-46B5-91BA-B86B98044A3C",
+      "name": "Line",
+      "rect": {
+        "x": 1256,
+        "y": 371,
+        "width": 160,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "1EFAD20C-41B1-459A-A61E-8BBE30A48071",
+      "parentID": "D5CBA217-2519-40E4-AC63-DA4C9CDC79B7",
+      "name": "13pt",
+      "rect": {
+        "x": 1264,
+        "y": 339,
+        "width": 28,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "ABF4685E-612B-49F0-BDC0-F2E78349980F",
+      "parentID": "1EFAD20C-41B1-459A-A61E-8BBE30A48071",
+      "name": "&#9999️Text1",
+      "rect": {
+        "x": 1264,
+        "y": 339,
+        "width": 8,
+        "height": 18
+      },
+      "type": "text",
+      "content": "-",
+      "color": {
+        "rgb": {
+          "r": 23,
+          "g": 133,
+          "b": 230
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "E242D266-1DF3-4A4D-BAFC-2071C74F0E1E",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 5",
+      "rect": {
+        "x": 504,
+        "y": 372,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "4D966376-E310-4A94-BDEB-D0C3E0AA5D72",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "E242D266-1DF3-4A4D-BAFC-2071C74F0E1E",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 372,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "48CA8992-CE25-41EE-B3A4-7C884DC596F8",
+      "parentID": "4D966376-E310-4A94-BDEB-D0C3E0AA5D72",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 372,
+        "width": 64,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "5AFDDC2D-BD04-488A-9012-6E9B98456C8A",
+      "parentID": "4D966376-E310-4A94-BDEB-D0C3E0AA5D72",
+      "name": "Line",
+      "rect": {
+        "x": 504,
+        "y": 419,
+        "width": 64,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0553AAFD-38BA-40BB-B37F-C5534FDE3B8F",
+      "parentID": "E242D266-1DF3-4A4D-BAFC-2071C74F0E1E",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 512,
+        "y": 387,
+        "width": 48,
+        "height": 18
+      },
+      "type": "text",
+      "content": "2",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "2307F64E-FB7E-4587-95EF-FD407C040D6F",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 6",
+      "rect": {
+        "x": 568,
+        "y": 372,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "3E20654F-B0F7-4474-8B0B-2760D32EAA80",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "2307F64E-FB7E-4587-95EF-FD407C040D6F",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 372,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "A62DBA41-5FA2-4F0A-AC66-B3446E934127",
+      "parentID": "3E20654F-B0F7-4474-8B0B-2760D32EAA80",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 372,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "02027C51-A9E6-4239-8D0B-E5C5F059C177",
+      "parentID": "3E20654F-B0F7-4474-8B0B-2760D32EAA80",
+      "name": "Line",
+      "rect": {
+        "x": 568,
+        "y": 419,
+        "width": 367.9999999999999,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "2806C625-1239-4891-AAB0-82547E50DC0A",
+      "parentID": "2307F64E-FB7E-4587-95EF-FD407C040D6F",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 576,
+        "y": 387,
+        "width": 351.9999999999999,
+        "height": 18
+      },
+      "type": "text",
+      "content": "YYYY-MM-DD HH:MM:SS～YYYY-MM-DD HH:MM:SS",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "B2D67934-06C8-4E85-944F-EDA180DB7224",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 7",
+      "rect": {
+        "x": 936,
+        "y": 372,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "E1FE228B-0420-4631-AFD9-785FF7BE8559",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "B2D67934-06C8-4E85-944F-EDA180DB7224",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 372,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "6B955BBB-97EB-4553-B57B-A511EC4A2D1C",
+      "parentID": "E1FE228B-0420-4631-AFD9-785FF7BE8559",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 372,
+        "width": 320,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "623DECBD-16C1-46D3-A480-FB91B8BF3FE9",
+      "parentID": "E1FE228B-0420-4631-AFD9-785FF7BE8559",
+      "name": "Line",
+      "rect": {
+        "x": 936,
+        "y": 419,
+        "width": 320,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "ED7652F7-E72E-42A6-B1D4-37CCE3C1B8D9",
+      "parentID": "B2D67934-06C8-4E85-944F-EDA180DB7224",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 944,
+        "y": 387,
+        "width": 304,
+        "height": 18
+      },
+      "type": "text",
+      "content": "已完成",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "A79185D9-6CD4-4429-BDB7-D865D17A034E",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text Button_2",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 9",
+      "rect": {
+        "x": 1256,
+        "y": 372,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "D37EBF23-50B6-45EF-B17F-C389EF06012D",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "A79185D9-6CD4-4429-BDB7-D865D17A034E",
+      "name": "_Other Resources/Shape/Table/Body",
+      "rect": {
+        "x": 1256,
+        "y": 372,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "B8951FDB-F39B-4319-A8F4-74856F5C7F71",
+      "parentID": "D37EBF23-50B6-45EF-B17F-C389EF06012D",
+      "name": "BG",
+      "rect": {
+        "x": 1256,
+        "y": 372,
+        "width": 160,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0044DB09-CF2E-4B3D-8034-7FF7E4B1E072",
+      "parentID": "D37EBF23-50B6-45EF-B17F-C389EF06012D",
+      "name": "Line",
+      "rect": {
+        "x": 1256,
+        "y": 419,
+        "width": 160,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "B5A64905-5217-4464-B564-CE3719615AF5",
+      "parentID": "A79185D9-6CD4-4429-BDB7-D865D17A034E",
+      "name": "13pt",
+      "rect": {
+        "x": 1264,
+        "y": 387,
+        "width": 28,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "C51366C1-E08B-456F-B5AC-B19C7E6D6E83",
+      "parentID": "B5A64905-5217-4464-B564-CE3719615AF5",
+      "name": "&#9999️Text1",
+      "rect": {
+        "x": 1264,
+        "y": 387,
+        "width": 8,
+        "height": 18
+      },
+      "type": "text",
+      "content": "-",
+      "color": {
+        "rgb": {
+          "r": 23,
+          "g": 133,
+          "b": 230
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "03470ED3-1BCE-4B9D-A98D-55CCCD30D325",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 5",
+      "rect": {
+        "x": 504,
+        "y": 420,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "00071151-AA94-4F2A-A39E-D1497FE8A6BE",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "03470ED3-1BCE-4B9D-A98D-55CCCD30D325",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 420,
+        "width": 64,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "70264C8F-C58A-420E-8AB4-3CB9819F8FBD",
+      "parentID": "00071151-AA94-4F2A-A39E-D1497FE8A6BE",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 420,
+        "width": 64,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "86C8EEA2-0AB6-425B-BC75-6BB858641879",
+      "parentID": "00071151-AA94-4F2A-A39E-D1497FE8A6BE",
+      "name": "Line",
+      "rect": {
+        "x": 504,
+        "y": 467,
+        "width": 64,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "36FD5918-8A59-4AE7-B7A1-608A073822D2",
+      "parentID": "03470ED3-1BCE-4B9D-A98D-55CCCD30D325",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 512,
+        "y": 435,
+        "width": 48,
+        "height": 18
+      },
+      "type": "text",
+      "content": "3",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "78B9D4D5-6A76-45F4-A3AC-9C21B652F689",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 6",
+      "rect": {
+        "x": 568,
+        "y": 420,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "7FF98851-E8B2-48AB-940C-5D8CADDDF500",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "78B9D4D5-6A76-45F4-A3AC-9C21B652F689",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 420,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "0FFEFC68-2896-4055-BFF0-65E2EC75CA8F",
+      "parentID": "7FF98851-E8B2-48AB-940C-5D8CADDDF500",
+      "name": "BG",
+      "rect": {
+        "x": 568,
+        "y": 420,
+        "width": 367.9999999999999,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "2CB25B0A-8929-4999-8BE5-B407DDE51D5E",
+      "parentID": "7FF98851-E8B2-48AB-940C-5D8CADDDF500",
+      "name": "Line",
+      "rect": {
+        "x": 568,
+        "y": 467,
+        "width": 367.9999999999999,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "F965778A-982B-4A5E-B294-A6AA41657A18",
+      "parentID": "78B9D4D5-6A76-45F4-A3AC-9C21B652F689",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 576,
+        "y": 435,
+        "width": 351.9999999999999,
+        "height": 18
+      },
+      "type": "text",
+      "content": "YYYY-MM-DD HH:MM:SS～YYYY-MM-DD HH:MM:SS",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "31B03B24-3A92-4967-96DB-828804770E68",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text+icon",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 7",
+      "rect": {
+        "x": 936,
+        "y": 420,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "3A9019C0-DD84-4694-9527-E7E4ECA5DF33",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "31B03B24-3A92-4967-96DB-828804770E68",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 420,
+        "width": 320,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "DE5C4DEC-706C-4445-B7D0-E8A740FF60C6",
+      "parentID": "3A9019C0-DD84-4694-9527-E7E4ECA5DF33",
+      "name": "BG",
+      "rect": {
+        "x": 936,
+        "y": 420,
+        "width": 320,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "6A443FEC-94D7-4922-8D6A-FD34E94D3A5B",
+      "parentID": "3A9019C0-DD84-4694-9527-E7E4ECA5DF33",
+      "name": "Line",
+      "rect": {
+        "x": 936,
+        "y": 467,
+        "width": 320,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "E989586B-73E8-4800-958F-E7FDFC50B312",
+      "symbolName": "3. DataInput数据录入/Text+Icon文本图标类/Icon+Text图标文本组合/Light/Text+D4+icon_自动宽度",
+      "parentID": "31B03B24-3A92-4967-96DB-828804770E68",
+      "name": "0. Elements元素/Icon+Text图标文本组合/Light/自动宽度_Left_12pt",
+      "rect": {
+        "x": 944,
+        "y": 435,
+        "width": 277.875,
+        "height": 18
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "7246E26B-ACB4-4D12-96CA-ABD0A16D4A4F",
+      "parentID": "E989586B-73E8-4800-958F-E7FDFC50B312",
+      "name": "Text",
+      "rect": {
+        "x": 944,
+        "y": 435,
+        "width": 151,
+        "height": 18
+      },
+      "type": "text",
+      "content": "已完成（n个设备执⾏异常）",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "CD824660-0883-45CC-8C5D-F4491EC35C47",
+      "parentID": "E989586B-73E8-4800-958F-E7FDFC50B312",
+      "name": "Icon",
+      "rect": {
+        "x": 1099,
+        "y": 436,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "exportable": [
+        {
+          "path": "icon/Status状态/warn_16.png"
+        }
+      ]
+    },
+    {
+      "objectID": "D37F8A58-0E8D-4D7B-AF0B-4F8ED73EE6E9",
+      "symbolName": "4. Views数据展示/Table表格/Cell/Light/Text Button_2",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "Elements/Table/S/Body Copy备份 9",
+      "rect": {
+        "x": 1256,
+        "y": 420,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "245B8F33-5327-4781-9733-152EC45FF595",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "D37F8A58-0E8D-4D7B-AF0B-4F8ED73EE6E9",
+      "name": "_Other Resources/Shape/Table/Body",
+      "rect": {
+        "x": 1256,
+        "y": 420,
+        "width": 160,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "FF682D68-7CBF-4B6C-B332-78F3ED7D6EFE",
+      "parentID": "245B8F33-5327-4781-9733-152EC45FF595",
+      "name": "BG",
+      "rect": {
+        "x": 1256,
+        "y": 420,
+        "width": 160,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "0CBA4ED2-3781-4F8B-BA1D-164A257D43F5",
+      "parentID": "245B8F33-5327-4781-9733-152EC45FF595",
+      "name": "Line",
+      "rect": {
+        "x": 1256,
+        "y": 467,
+        "width": 160,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "A93FD569-1BA7-4F82-9CA2-A6A71BCA37EA",
+      "parentID": "D37F8A58-0E8D-4D7B-AF0B-4F8ED73EE6E9",
+      "name": "13pt",
+      "rect": {
+        "x": 1264,
+        "y": 435,
+        "width": 92,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "4769A7B3-9497-414A-A4FE-2D38F97294C6",
+      "parentID": "A93FD569-1BA7-4F82-9CA2-A6A71BCA37EA",
+      "name": "&#9999️Text1",
+      "rect": {
+        "x": 1264,
+        "y": 435,
+        "width": 72,
+        "height": 18
+      },
+      "type": "text",
+      "content": "查看异常列表",
+      "color": {
+        "rgb": {
+          "r": 23,
+          "g": 133,
+          "b": 230
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "symbolName": "2. Navigation导航/Pagination翻页控件/Light/Default",
+      "parentID": "EE4B04B6-C34E-4188-B54F-524C7E5EE483",
+      "name": "2. Navigation导航/Pagination翻页控件/Light/Default",
+      "rect": {
+        "x": 504,
+        "y": 468,
+        "width": 912,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "20A9C3D4-3D5A-4F06-B135-147B8A0A2416",
+      "symbolName": "_Other Resources/Shape形状/Light/Basic_Fill",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 468,
+        "width": 912,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "54C0D939-EF0A-4ACF-BAB1-FFF7649C5615",
+      "parentID": "20A9C3D4-3D5A-4F06-B135-147B8A0A2416",
+      "name": "BG",
+      "rect": {
+        "x": 504,
+        "y": 468,
+        "width": 912,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "7729C3B4-C639-42BB-A3D7-65D01691AE44",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 504,
+        "y": 479,
+        "width": 210.46153846153845,
+        "height": 18
+      },
+      "type": "text",
+      "content": "共计9条  第1/1页",
+      "color": {
+        "rgb": {
+          "r": 153,
+          "g": 153,
+          "b": 153
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "Group",
+      "rect": {
+        "x": 1132,
+        "y": 479,
+        "width": 152,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "E927DAE5-5F8B-48FB-BCE7-A0B8E56124E1",
+      "parentID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "name": "&#9999️Typing Copy 4",
+      "rect": {
+        "x": 1196,
+        "y": 479,
+        "width": 24,
+        "height": 18
+      },
+      "type": "text",
+      "content": "1",
+      "color": {
+        "rgb": {
+          "r": 23,
+          "g": 133,
+          "b": 230
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "center",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "4BA646E3-601B-4F6D-9EF7-7F926A4F7CA0",
+      "parentID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "name": "icon/Arrow/arrow_left_to_line",
+      "rect": {
+        "x": 1132,
+        "y": 480,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 179,
+              "g": 179,
+              "b": 179
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/arrow_left_to_line.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "EDB9D447-B04E-4FB9-B023-A743A7B6F10C",
+      "parentID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "name": "icon/Arrow/arrow_left",
+      "rect": {
+        "x": 1164,
+        "y": 480,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 179,
+              "g": 179,
+              "b": 179
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/arrow_left.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "A8AD0E76-5441-464A-BF69-17E8A1F53581",
+      "parentID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "name": "icon/Arrow/arrow_right",
+      "rect": {
+        "x": 1236,
+        "y": 480,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 179,
+              "g": 179,
+              "b": 179
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/arrow_right.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "1BAD8299-C1F2-4044-808B-6DBE616529B3",
+      "parentID": "C28FA227-8AD5-4607-BC1C-0302623F2AF0",
+      "name": "icon/Arrow/Last",
+      "rect": {
+        "x": 1268,
+        "y": 480,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 179,
+              "g": 179,
+              "b": 179
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/arrow_right_to_line.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "143E69C4-0A13-494F-8518-AC36A1C641D3",
+      "symbolName": "3. DataInput数据录入/Select选择器/24/Light/下拉框_Selected",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "Elements/Input/S/Pull down Copy",
+      "rect": {
+        "x": 1020,
+        "y": 476,
+        "width": 96,
+        "height": 24
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "D1D7DDE5-BDA3-4480-901C-249E8DC47D8C",
+      "parentID": "143E69C4-0A13-494F-8518-AC36A1C641D3",
+      "name": "BG",
+      "rect": {
+        "x": 1020,
+        "y": 476,
+        "width": 96,
+        "height": 24
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        2
+      ],
+      "borders": [
+        {
+          "width": 1,
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          }
+        }
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "20C18DB5-7412-4928-B676-8A1B77C74F75",
+      "parentID": "143E69C4-0A13-494F-8518-AC36A1C641D3",
+      "name": "icon",
+      "rect": {
+        "x": 1092,
+        "y": 480,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Arrow箭头/arrow_down.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "1C2777A1-7E64-45F0-9298-3CFD6772AFB4",
+      "parentID": "143E69C4-0A13-494F-8518-AC36A1C641D3",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 1028,
+        "y": 479,
+        "width": 56,
+        "height": 18
+      },
+      "type": "text",
+      "content": "X条/页",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "C6FE20D1-CAEA-4A85-8AD3-923C2C622B60",
+      "symbolName": "3. DataInput数据录入/Input输入/24/Light/Annotation单位",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "Elements/Input/S/Pull down",
+      "rect": {
+        "x": 1352,
+        "y": 476,
+        "width": 64,
+        "height": 24
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "257659BA-D537-4125-9674-813185B6D3BE",
+      "parentID": "C6FE20D1-CAEA-4A85-8AD3-923C2C622B60",
+      "name": "BG",
+      "rect": {
+        "x": 1352,
+        "y": 476,
+        "width": 64,
+        "height": 24
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        2
+      ],
+      "borders": [
+        {
+          "width": 1,
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          }
+        }
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "E3228946-0C21-471B-A941-E0DF2E7FD01C",
+      "parentID": "C6FE20D1-CAEA-4A85-8AD3-923C2C622B60",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 1360,
+        "y": 479,
+        "width": 48,
+        "height": 18
+      },
+      "type": "text",
+      "content": "页",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "right",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "61FDEDB2-6A42-441E-BFFC-DF9ECF18718E",
+      "parentID": "E258E6C8-076C-4CFE-AA80-554EA0E4CB73",
+      "name": "Group 2",
+      "rect": {
+        "x": 1308,
+        "y": 480,
+        "width": 36,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "8F964C2D-450F-406D-B914-8B89C3B00B7E",
+      "parentID": "61FDEDB2-6A42-441E-BFFC-DF9ECF18718E",
+      "name": "&#9999️Typing Copy 4",
+      "rect": {
+        "x": 1308,
+        "y": 480,
+        "width": 36,
+        "height": 18
+      },
+      "type": "text",
+      "content": "前往第",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "right",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    }
+  ],
+  "flowStartPoint": false
+}

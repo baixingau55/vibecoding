@@ -1,0 +1,125 @@
+{
+  "pageName": "巡检任务",
+  "pageObjectID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+  "name": "添加巡检任务_03保存_02保存成功",
+  "slug": "巡检任务-6-添加巡检任务_03保存_02保存成功",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#f0f3faff",
+  "imagePath": "preview/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-6-%E6%B7%BB%E5%8A%A0%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1_03%E4%BF%9D%E5%AD%98_02%E4%BF%9D%E5%AD%98%E6%88%90%E5%8A%9F.png",
+  "imageIconPath": "preview/icons/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-6-%E6%B7%BB%E5%8A%A0%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1_03%E4%BF%9D%E5%AD%98_02%E4%BF%9D%E5%AD%98%E6%88%90%E5%8A%9F.png",
+  "layers": [
+    {
+      "objectID": "936D3A2E-4D30-4F37-A637-789032E09BE9",
+      "parentID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+      "name": "添加巡检任务_03保存_02保存成功",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "8B7E4730-362C-4DF7-8927-3321007C4832",
+      "symbolName": "5. Feedback反馈/Toast全局提示/Light/Content",
+      "parentID": "936D3A2E-4D30-4F37-A637-789032E09BE9",
+      "name": "5. Feedback反馈/Toast全局提示/Light/Content",
+      "rect": {
+        "x": 860,
+        "y": 200,
+        "width": 200,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "81155D5E-FC80-43B6-949F-842FD3791427",
+      "parentID": "8B7E4730-362C-4DF7-8927-3321007C4832",
+      "name": "Mask",
+      "rect": {
+        "x": 860,
+        "y": 200,
+        "width": 200,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        4
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 51,
+              "g": 51,
+              "b": 51
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "opacity": 0.800000011920929
+    },
+    {
+      "objectID": "19780442-3CEB-4FF7-8FC0-819BA6304869",
+      "parentID": "8B7E4730-362C-4DF7-8927-3321007C4832",
+      "name": "Content",
+      "rect": {
+        "x": 920,
+        "y": 214,
+        "width": 80,
+        "height": 20
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "0E8751A7-DF0F-4761-9CC0-A39153E26AF1",
+      "parentID": "19780442-3CEB-4FF7-8FC0-819BA6304869",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 944,
+        "y": 214,
+        "width": 56,
+        "height": 20
+      },
+      "type": "text",
+      "opacity": 0.9,
+      "content": "添加成功",
+      "color": {
+        "rgb": {
+          "r": 255,
+          "g": 255,
+          "b": 255
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "center",
+      "letterSpacing": 0
+    },
+    {
+      "objectID": "7376D807-9F79-4256-BDBB-E6D4902C0F24",
+      "parentID": "19780442-3CEB-4FF7-8FC0-819BA6304869",
+      "name": "Retract",
+      "rect": {
+        "x": 920,
+        "y": 216,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "exportable": [
+        {
+          "path": "icon/Status状态/success_16.png"
+        }
+      ]
+    }
+  ],
+  "flowStartPoint": false
+}

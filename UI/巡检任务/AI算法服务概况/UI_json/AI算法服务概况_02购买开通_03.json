@@ -1,0 +1,125 @@
+{
+  "pageName": "巡检任务",
+  "pageObjectID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+  "name": "AI算法服务概况_02购买开通_03",
+  "slug": "巡检任务-4-ai算法服务概况_02购买开通_03",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#f0f3faff",
+  "imagePath": "preview/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-4-ai%E7%AE%97%E6%B3%95%E6%9C%8D%E5%8A%A1%E6%A6%82%E5%86%B5_02%E8%B4%AD%E4%B9%B0%E5%BC%80%E9%80%9A_03.png",
+  "imageIconPath": "preview/icons/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-4-ai%E7%AE%97%E6%B3%95%E6%9C%8D%E5%8A%A1%E6%A6%82%E5%86%B5_02%E8%B4%AD%E4%B9%B0%E5%BC%80%E9%80%9A_03.png",
+  "layers": [
+    {
+      "objectID": "E60BB2CF-3650-490C-92EF-3B7FB181BF5C",
+      "parentID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+      "name": "AI算法服务概况_02购买开通_03",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "F4211B1A-7163-45F8-8905-DAA90BDE75B9",
+      "symbolName": "5. Feedback反馈/Toast全局提示/Light/Content",
+      "parentID": "E60BB2CF-3650-490C-92EF-3B7FB181BF5C",
+      "name": "5. Feedback反馈/Toast全局提示/Light/Content",
+      "rect": {
+        "x": 837,
+        "y": 200,
+        "width": 246,
+        "height": 48
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "D1A86322-E192-4441-9C11-E89408936F57",
+      "parentID": "F4211B1A-7163-45F8-8905-DAA90BDE75B9",
+      "name": "Mask",
+      "rect": {
+        "x": 837,
+        "y": 200,
+        "width": 246,
+        "height": 48
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        4
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 51,
+              "g": 51,
+              "b": 51
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "opacity": 0.800000011920929
+    },
+    {
+      "objectID": "37FA0E6B-5084-470F-80F7-5F203E2B7F4C",
+      "parentID": "F4211B1A-7163-45F8-8905-DAA90BDE75B9",
+      "name": "Content",
+      "rect": {
+        "x": 853,
+        "y": 214,
+        "width": 214,
+        "height": 20
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "AC8278EA-9FCA-4A78-8607-0EDFE3233545",
+      "parentID": "37FA0E6B-5084-470F-80F7-5F203E2B7F4C",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 877,
+        "y": 214,
+        "width": 190,
+        "height": 20
+      },
+      "type": "text",
+      "opacity": 0.9,
+      "content": "已成功购买算法分析次数x千次",
+      "color": {
+        "rgb": {
+          "r": 255,
+          "g": 255,
+          "b": 255
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "center",
+      "letterSpacing": 0
+    },
+    {
+      "objectID": "A11ECD4E-BB08-4DA0-9FC4-79678BF5F4D0",
+      "parentID": "37FA0E6B-5084-470F-80F7-5F203E2B7F4C",
+      "name": "Retract",
+      "rect": {
+        "x": 853,
+        "y": 216,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "exportable": [
+        {
+          "path": "icon/Status状态/success_16.png"
+        }
+      ]
+    }
+  ],
+  "flowStartPoint": false
+}

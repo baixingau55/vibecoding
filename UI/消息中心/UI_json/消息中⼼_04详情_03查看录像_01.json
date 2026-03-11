@@ -1,0 +1,622 @@
+{
+  "pageName": "消息中心",
+  "pageObjectID": "57AE3205-1862-406F-811B-029E6ACB936F",
+  "name": "消息中⼼_04详情_03查看录像_01",
+  "slug": "消息中心-9-消息中⼼_04详情_03查看录像_01",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#ffffffff",
+  "imagePath": "preview/%E6%B6%88%E6%81%AF%E4%B8%AD%E5%BF%83-9-%E6%B6%88%E6%81%AF%E4%B8%AD%E2%BC%BC_04%E8%AF%A6%E6%83%85_03%E6%9F%A5%E7%9C%8B%E5%BD%95%E5%83%8F_01.png",
+  "imageIconPath": "preview/icons/%E6%B6%88%E6%81%AF%E4%B8%AD%E5%BF%83-9-%E6%B6%88%E6%81%AF%E4%B8%AD%E2%BC%BC_04%E8%AF%A6%E6%83%85_03%E6%9F%A5%E7%9C%8B%E5%BD%95%E5%83%8F_01.png",
+  "layers": [
+    {
+      "objectID": "59CD1027-E971-41A7-A862-F476232EA852",
+      "parentID": "57AE3205-1862-406F-811B-029E6ACB936F",
+      "name": "消息中⼼_04详情_03查看录像_01",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "66FC1DAC-7E41-4C28-9EAE-E4A4F6D51358",
+      "symbolName": "Elements/Page/Mask",
+      "parentID": "59CD1027-E971-41A7-A862-F476232EA852",
+      "name": "Modules/Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "33FFA00D-7442-44FF-9001-026F068B1A70",
+      "parentID": "66FC1DAC-7E41-4C28-9EAE-E4A4F6D51358",
+      "name": "Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "opacity": 0.2000000029802322
+    },
+    {
+      "objectID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "parentID": "59CD1027-E971-41A7-A862-F476232EA852",
+      "name": "Dialog备份 2",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "566E59B1-B295-48AE-B9C5-181BB0DD3CD4",
+      "symbolName": "_Other Resources/Shape形状/Light/Dialog",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Body",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "E11696B8-DE6E-4832-9BBA-D5902431C932",
+      "parentID": "566E59B1-B295-48AE-B9C5-181BB0DD3CD4",
+      "name": "Rectangle",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "shadows": [
+        {
+          "offsetX": 0,
+          "offsetY": 12,
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "blurRadius": 48
+        }
+      ]
+    },
+    {
+      "objectID": "CCB503EF-C4ED-4943-B16D-5C7E52E80A31",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Map",
+      "rect": {
+        "x": 480,
+        "y": 260,
+        "width": 960,
+        "height": 560
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 217,
+              "g": 217,
+              "b": 217
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "A640AF37-591F-422A-B8DA-C763A455038F",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Top",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "0. Elements元素/Shape形状/Light/Line_Right",
+      "rect": {
+        "x": 480,
+        "y": 820,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "08117B61-C7A6-4A16-8205-22A9C63062A8",
+      "parentID": "A640AF37-591F-422A-B8DA-C763A455038F",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 820,
+        "width": 960,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "12199579-9A35-4A6E-B48D-84C6D87D1EDB",
+      "parentID": "A640AF37-591F-422A-B8DA-C763A455038F",
+      "name": "Line",
+      "rect": {
+        "x": 480,
+        "y": 820,
+        "width": 960,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "9575FA4B-9746-4D6B-8CA2-31E365BB383B",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "icon/Media媒体/play_fill",
+      "rect": {
+        "x": 504,
+        "y": 828,
+        "width": 24,
+        "height": 24
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Media媒体/pause.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "E9ACD930-B0A1-4C72-BAA7-59ACC59036F3",
+      "symbolName": "4. Views数据展示/Process进程/Light/Default",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "3. DataEntry数据录入/Process进度条类/Light/文本+进度条",
+      "rect": {
+        "x": 544,
+        "y": 836,
+        "width": 776,
+        "height": 8
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "D4FDD693-3050-47F8-8E65-EBA892B5428A",
+      "parentID": "E9ACD930-B0A1-4C72-BAA7-59ACC59036F3",
+      "name": "BG",
+      "rect": {
+        "x": 544,
+        "y": 836,
+        "width": 776,
+        "height": 8
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "64964C77-6C39-422A-8839-03DF6CD2AF99",
+      "parentID": "E9ACD930-B0A1-4C72-BAA7-59ACC59036F3",
+      "name": "Progress",
+      "rect": {
+        "x": 544,
+        "y": 836,
+        "width": 396.3142857142857,
+        "height": 8
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 23,
+              "g": 133,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "5EB8FA22-FB5F-4409-9681-FBF8B373071C",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "01:53/05:00",
+      "rect": {
+        "x": 1336,
+        "y": 831,
+        "width": 80,
+        "height": 18
+      },
+      "type": "text",
+      "content": "01:53/05:00",
+      "color": {
+        "rgb": {
+          "r": 102,
+          "g": 102,
+          "b": 102
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    },
+    {
+      "objectID": "8609DA2C-CE98-4350-A5C7-A2347EFDF9D7",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Map",
+      "rect": {
+        "x": 480,
+        "y": 270,
+        "width": 960,
+        "height": 540
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ]
+    },
+    {
+      "objectID": "C757E6D5-AA72-4CE4-A8E3-61A56509F678",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/x/Light/Head",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Head",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "658E2BF4-B72D-418F-9B38-7E8DF7393CAB",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "C757E6D5-AA72-4CE4-A8E3-61A56509F678",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "C844D43F-43E8-46DE-8249-D8B0E64AEC36",
+      "parentID": "658E2BF4-B72D-418F-9B38-7E8DF7393CAB",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "79443498-3FCD-4093-8ECF-6E9A86EA2EB9",
+      "parentID": "658E2BF4-B72D-418F-9B38-7E8DF7393CAB",
+      "name": "Line",
+      "rect": {
+        "x": 480,
+        "y": 259,
+        "width": 960,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "35B98BC4-95D1-40AE-98CA-F0C6D129DB2E",
+      "parentID": "C757E6D5-AA72-4CE4-A8E3-61A56509F678",
+      "name": "icon/Common/Close",
+      "rect": {
+        "x": 1400,
+        "y": 232,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Common通用/x.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "8551821D-2EF4-4089-8843-FDC22E32669F",
+      "parentID": "C757E6D5-AA72-4CE4-A8E3-61A56509F678",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 504,
+        "y": 230,
+        "width": 888,
+        "height": 20
+      },
+      "type": "text",
+      "content": " TL-NVR01_通道01 移动侦测录像",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 8,
+      "fontFamily": "PingFangSC-Semibold",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    },
+    {
+      "objectID": "30E0930D-AD1A-4584-97E8-EA6AF9414B7A",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Rectangle 14",
+      "rect": {
+        "x": 544,
+        "y": 820,
+        "width": 2,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 235,
+              "g": 94,
+              "b": 84
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "3E60D5C8-C6EB-43E0-BF78-431820315276",
+      "parentID": "1B0CF93C-7BE9-4F28-8EC4-363C15CFFCE1",
+      "name": "Group",
+      "rect": {
+        "x": 483,
+        "y": 802,
+        "width": 126,
+        "height": 18
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "E35065FA-F5C3-4155-BDFE-DAADEE1D4927",
+      "parentID": "3E60D5C8-C6EB-43E0-BF78-431820315276",
+      "name": "Rectangle 6061",
+      "rect": {
+        "x": 483,
+        "y": 802,
+        "width": 126,
+        "height": 18
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        8
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 51,
+              "g": 51,
+              "b": 51
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "opacity": 0.800000011920929
+    },
+    {
+      "objectID": "2A254803-15F6-49D0-BB45-92DFE7A2265F",
+      "parentID": "3E60D5C8-C6EB-43E0-BF78-431820315276",
+      "name": "2017-1-4  09:40:23",
+      "rect": {
+        "x": 491,
+        "y": 802,
+        "width": 109,
+        "height": 18
+      },
+      "type": "text",
+      "content": "2017-1-4  09:40:23",
+      "color": {
+        "rgb": {
+          "r": 255,
+          "g": 255,
+          "b": 255
+        },
+        "alpha": 255
+      },
+      "fontSize": 12,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 18
+    }
+  ],
+  "flowStartPoint": false
+}

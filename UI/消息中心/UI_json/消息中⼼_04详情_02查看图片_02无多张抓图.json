@@ -1,0 +1,324 @@
+{
+  "pageName": "消息中心",
+  "pageObjectID": "57AE3205-1862-406F-811B-029E6ACB936F",
+  "name": "消息中⼼_04详情_02查看图片_02无多张抓图",
+  "slug": "消息中心-8-消息中⼼_04详情_02查看图片_02无多张抓图",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#ffffffff",
+  "imagePath": "preview/%E6%B6%88%E6%81%AF%E4%B8%AD%E5%BF%83-8-%E6%B6%88%E6%81%AF%E4%B8%AD%E2%BC%BC_04%E8%AF%A6%E6%83%85_02%E6%9F%A5%E7%9C%8B%E5%9B%BE%E7%89%87_02%E6%97%A0%E5%A4%9A%E5%BC%A0%E6%8A%93%E5%9B%BE.png",
+  "imageIconPath": "preview/icons/%E6%B6%88%E6%81%AF%E4%B8%AD%E5%BF%83-8-%E6%B6%88%E6%81%AF%E4%B8%AD%E2%BC%BC_04%E8%AF%A6%E6%83%85_02%E6%9F%A5%E7%9C%8B%E5%9B%BE%E7%89%87_02%E6%97%A0%E5%A4%9A%E5%BC%A0%E6%8A%93%E5%9B%BE.png",
+  "layers": [
+    {
+      "objectID": "C54365EB-329A-474C-9431-7FDFC1CF28D1",
+      "parentID": "57AE3205-1862-406F-811B-029E6ACB936F",
+      "name": "消息中⼼_04详情_02查看图片_02无多张抓图",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "7666EA72-09CF-4F8E-8206-7901D74189A2",
+      "symbolName": "Elements/Page/Mask",
+      "parentID": "C54365EB-329A-474C-9431-7FDFC1CF28D1",
+      "name": "Modules/Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "E823CBEB-19CF-4E84-A01F-949AB6E96E2A",
+      "parentID": "7666EA72-09CF-4F8E-8206-7901D74189A2",
+      "name": "Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "opacity": 0.2000000029802322
+    },
+    {
+      "objectID": "1F8843BC-D2C0-4882-AA5A-4AB062E45390",
+      "parentID": "C54365EB-329A-474C-9431-7FDFC1CF28D1",
+      "name": "Dialog备份 2",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "group"
+    },
+    {
+      "objectID": "95AB3AFC-1ED0-4D64-8107-8810228520E6",
+      "symbolName": "_Other Resources/Shape形状/Light/Dialog",
+      "parentID": "1F8843BC-D2C0-4882-AA5A-4AB062E45390",
+      "name": "Body",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "B8E3835B-98CE-4178-A866-43C43AA5D634",
+      "parentID": "95AB3AFC-1ED0-4D64-8107-8810228520E6",
+      "name": "Rectangle",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 640
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "shadows": [
+        {
+          "offsetX": 0,
+          "offsetY": 12,
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "blurRadius": 48
+        }
+      ]
+    },
+    {
+      "objectID": "5E157285-64EC-442A-9A23-0771A77294C7",
+      "parentID": "1F8843BC-D2C0-4882-AA5A-4AB062E45390",
+      "name": "Map",
+      "rect": {
+        "x": 480,
+        "y": 260,
+        "width": 960,
+        "height": 600
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 217,
+              "g": 217,
+              "b": 217
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "8F02439B-6FE2-423B-B56A-125AD8754F07",
+      "parentID": "1F8843BC-D2C0-4882-AA5A-4AB062E45390",
+      "name": "Map",
+      "rect": {
+        "x": 480,
+        "y": 290,
+        "width": 960,
+        "height": 540
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ]
+    },
+    {
+      "objectID": "98AC33C2-5FD4-4A28-A05A-9345C8C6CF5B",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/x/Light/Head",
+      "parentID": "1F8843BC-D2C0-4882-AA5A-4AB062E45390",
+      "name": "Head",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "2245EDA6-D9A3-48D2-A9D1-4EBA153BF331",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "98AC33C2-5FD4-4A28-A05A-9345C8C6CF5B",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "FB500051-90F6-4E73-B01C-EBB3C9476A3A",
+      "parentID": "2245EDA6-D9A3-48D2-A9D1-4EBA153BF331",
+      "name": "BG",
+      "rect": {
+        "x": 480,
+        "y": 220,
+        "width": 960,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "EFEA2BF1-5067-415C-983A-280A52D3C2C9",
+      "parentID": "2245EDA6-D9A3-48D2-A9D1-4EBA153BF331",
+      "name": "Line",
+      "rect": {
+        "x": 480,
+        "y": 259,
+        "width": 960,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "AA1E205B-0F5C-4767-953B-B32F2E660E25",
+      "parentID": "98AC33C2-5FD4-4A28-A05A-9345C8C6CF5B",
+      "name": "icon/Common/Close",
+      "rect": {
+        "x": 1400,
+        "y": 232,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Common通用/x.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "D4A50AA2-9B02-4B0D-B92A-CFE1853D156B",
+      "parentID": "98AC33C2-5FD4-4A28-A05A-9345C8C6CF5B",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 504,
+        "y": 230,
+        "width": 888,
+        "height": 20
+      },
+      "type": "text",
+      "content": " TL-NVR01_通道01 移动侦测抓图",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 8,
+      "fontFamily": "PingFangSC-Semibold",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    }
+  ],
+  "flowStartPoint": false
+}

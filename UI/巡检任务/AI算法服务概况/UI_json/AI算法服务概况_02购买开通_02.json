@@ -1,0 +1,526 @@
+{
+  "pageName": "巡检任务",
+  "pageObjectID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+  "name": "AI算法服务概况_02购买开通_02",
+  "slug": "巡检任务-3-ai算法服务概况_02购买开通_02",
+  "width": 1920,
+  "height": 1080,
+  "backgroundColor": "#f0f3faff",
+  "imagePath": "preview/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-3-ai%E7%AE%97%E6%B3%95%E6%9C%8D%E5%8A%A1%E6%A6%82%E5%86%B5_02%E8%B4%AD%E4%B9%B0%E5%BC%80%E9%80%9A_02.png",
+  "imageIconPath": "preview/icons/%E5%B7%A1%E6%A3%80%E4%BB%BB%E5%8A%A1-3-ai%E7%AE%97%E6%B3%95%E6%9C%8D%E5%8A%A1%E6%A6%82%E5%86%B5_02%E8%B4%AD%E4%B9%B0%E5%BC%80%E9%80%9A_02.png",
+  "layers": [
+    {
+      "objectID": "33E8D642-ADE8-4C5E-86A6-39EF4D791D48",
+      "parentID": "D91C4EB9-A8FD-4871-98E3-EC3A0D0D4EDF",
+      "name": "AI算法服务概况_02购买开通_02",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shape"
+    },
+    {
+      "objectID": "15E1EDFC-731D-4066-BCD0-3DAC9518B39A",
+      "symbolName": "1. Common通用/Mask遮罩/Black_A20（默认）",
+      "parentID": "33E8D642-ADE8-4C5E-86A6-39EF4D791D48",
+      "name": "Elements/Page/Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "AEDF3799-A09F-4C59-B344-DC40AE5897EB",
+      "parentID": "15E1EDFC-731D-4066-BCD0-3DAC9518B39A",
+      "name": "Mask",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "D4067999-31F2-42AC-B03B-C283CD2685B8",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/Light/480宽/Text",
+      "parentID": "33E8D642-ADE8-4C5E-86A6-39EF4D791D48",
+      "name": "5. Feedback反馈/Dialog弹窗/Light/480宽/Result_description",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 188
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "67015951-9831-4BAA-A104-A0018BAB12BF",
+      "symbolName": "_Other Resources/Shape形状/Light/Dialog",
+      "parentID": "D4067999-31F2-42AC-B03B-C283CD2685B8",
+      "name": "Body",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 188
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "8602DEE2-FD65-4D0F-8DB8-C503DB33F1AC",
+      "parentID": "67015951-9831-4BAA-A104-A0018BAB12BF",
+      "name": "Rectangle",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 188
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "shadows": [
+        {
+          "offsetX": 0,
+          "offsetY": 12,
+          "color": {
+            "rgb": {
+              "r": 0,
+              "g": 0,
+              "b": 0
+            },
+            "alpha": 51
+          },
+          "blurRadius": 48
+        }
+      ]
+    },
+    {
+      "objectID": "0CB97999-0898-4105-B5D6-0646627107B8",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/x/Light/Foot_button_2_positive",
+      "parentID": "D4067999-31F2-42AC-B03B-C283CD2685B8",
+      "name": "Foot",
+      "rect": {
+        "x": 720,
+        "y": 554,
+        "width": 480,
+        "height": 80
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "486932BC-1A9A-489F-90E4-D50F3C1E0F45",
+      "symbolName": "_Other Resources/Shape形状/Light/Basic_Fill",
+      "parentID": "0CB97999-0898-4105-B5D6-0646627107B8",
+      "name": "BG",
+      "rect": {
+        "x": 720,
+        "y": 554,
+        "width": 480,
+        "height": 80
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "0DE3A32E-A414-4915-9346-4F089EFA94D0",
+      "parentID": "486932BC-1A9A-489F-90E4-D50F3C1E0F45",
+      "name": "BG",
+      "rect": {
+        "x": 720,
+        "y": 554,
+        "width": 480,
+        "height": 80
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "EC3B526F-1D4A-488A-8443-EC29AE76A717",
+      "symbolName": "1. Common通用/Button按钮/32/Bulk Button填充按钮/Light/Fill_Blue_Normal",
+      "parentID": "0CB97999-0898-4105-B5D6-0646627107B8",
+      "name": "Button_2",
+      "rect": {
+        "x": 1056,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "E7B874C9-FFC5-402E-9373-DA2FB3D528DD",
+      "symbolName": "_Other Resources/Shape形状/Light/Basic_Fill_Rdius2",
+      "parentID": "EC3B526F-1D4A-488A-8443-EC29AE76A717",
+      "name": "Button Shape",
+      "rect": {
+        "x": 1056,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "07C4E010-9E2D-4A1F-8F7A-C679CE261089",
+      "parentID": "E7B874C9-FFC5-402E-9373-DA2FB3D528DD",
+      "name": "BG",
+      "rect": {
+        "x": 1056,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        2
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 23,
+              "g": 133,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "C8C37ED9-76BA-4A2E-9418-94C2A20AA963",
+      "parentID": "EC3B526F-1D4A-488A-8443-EC29AE76A717",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 1068,
+        "y": 584,
+        "width": 96,
+        "height": 20
+      },
+      "type": "text",
+      "content": "确定",
+      "color": {
+        "rgb": {
+          "r": 255,
+          "g": 255,
+          "b": 255
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 8,
+      "fontFamily": "PingFangSC-Semibold",
+      "textAlign": "center",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    },
+    {
+      "objectID": "FF34F6B3-0089-4CB9-A200-FB3EC6DF9079",
+      "symbolName": "1. Common通用/Button按钮/32/Bulk Button填充按钮/Light/Fill_Grey_Normal",
+      "parentID": "0CB97999-0898-4105-B5D6-0646627107B8",
+      "name": "Button_1",
+      "rect": {
+        "x": 924,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "792B3C6B-FFC1-4EE4-AD23-2B54655CC4C7",
+      "symbolName": "_Other Resources/Shape形状/Light/Basic_Fill_Rdius2",
+      "parentID": "FF34F6B3-0089-4CB9-A200-FB3EC6DF9079",
+      "name": "Button Shape",
+      "rect": {
+        "x": 924,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "B06A2DD0-9EDA-4333-8FEE-DC5DF21995E5",
+      "parentID": "792B3C6B-FFC1-4EE4-AD23-2B54655CC4C7",
+      "name": "BG",
+      "rect": {
+        "x": 924,
+        "y": 578,
+        "width": 120,
+        "height": 32
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        2
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 230,
+              "g": 230,
+              "b": 230
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "86033E5C-E165-41F1-B616-ED3CCF00B690",
+      "parentID": "FF34F6B3-0089-4CB9-A200-FB3EC6DF9079",
+      "name": "&#9999️Typing",
+      "rect": {
+        "x": 936,
+        "y": 584,
+        "width": 96,
+        "height": 20
+      },
+      "type": "text",
+      "content": "取消",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "center",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    },
+    {
+      "objectID": "F99461B5-A256-43A3-805D-841C4A759B13",
+      "parentID": "D4067999-31F2-42AC-B03B-C283CD2685B8",
+      "name": "Type something",
+      "rect": {
+        "x": 744,
+        "y": 510,
+        "width": 432,
+        "height": 20
+      },
+      "type": "text",
+      "content": "确定要使用余额购买算法分析次数（x千次）吗？",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 5,
+      "fontFamily": "PingFangSC-Regular",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    },
+    {
+      "objectID": "A837A35E-A6FE-4661-9C25-531BD9897D12",
+      "symbolName": "5. Feedback反馈/Dialog弹窗/x/Light/Head",
+      "parentID": "D4067999-31F2-42AC-B03B-C283CD2685B8",
+      "name": "Head",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "DCC8BEC2-1C7E-4A0F-8F80-D71D7909660E",
+      "symbolName": "_Other Resources/Shape形状/Light/Line_Bottom",
+      "parentID": "A837A35E-A6FE-4661-9C25-531BD9897D12",
+      "name": "BG",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 40
+      },
+      "type": "symbol"
+    },
+    {
+      "objectID": "AA803B18-357C-4054-80E8-77A89A79CA61",
+      "parentID": "DCC8BEC2-1C7E-4A0F-8F80-D71D7909660E",
+      "name": "BG",
+      "rect": {
+        "x": 720,
+        "y": 446,
+        "width": 480,
+        "height": 40
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "C6C6CDEE-0615-49CC-8180-F2340D17904D",
+      "parentID": "DCC8BEC2-1C7E-4A0F-8F80-D71D7909660E",
+      "name": "Line",
+      "rect": {
+        "x": 720,
+        "y": 485,
+        "width": 480,
+        "height": 1
+      },
+      "type": "shapePath",
+      "cornerRadius": [
+        0
+      ],
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 204,
+              "g": 204,
+              "b": 204
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ]
+    },
+    {
+      "objectID": "37EAEC40-2A61-453A-A3F1-5DF41F0FB949",
+      "parentID": "A837A35E-A6FE-4661-9C25-531BD9897D12",
+      "name": "icon/Common/Close",
+      "rect": {
+        "x": 1160,
+        "y": 458,
+        "width": 16,
+        "height": 16
+      },
+      "type": "slice",
+      "fills": [
+        {
+          "color": {
+            "rgb": {
+              "r": 102,
+              "g": 102,
+              "b": 102
+            },
+            "alpha": 255
+          },
+          "fillType": "Color",
+          "gradient": {}
+        }
+      ],
+      "exportable": [
+        {
+          "path": "icon/Common通用/x.svg"
+        }
+      ]
+    },
+    {
+      "objectID": "4B60AB4F-210D-4EEB-B69A-42A911589351",
+      "parentID": "A837A35E-A6FE-4661-9C25-531BD9897D12",
+      "name": "&#9999️Title",
+      "rect": {
+        "x": 744,
+        "y": 456,
+        "width": 408,
+        "height": 20
+      },
+      "type": "text",
+      "content": "余额支付",
+      "color": {
+        "rgb": {
+          "r": 26,
+          "g": 26,
+          "b": 26
+        },
+        "alpha": 255
+      },
+      "fontSize": 14,
+      "fontWeight": 8,
+      "fontFamily": "PingFangSC-Semibold",
+      "textAlign": "left",
+      "letterSpacing": 0,
+      "lineHeight": 20
+    }
+  ],
+  "flowStartPoint": false
+}
