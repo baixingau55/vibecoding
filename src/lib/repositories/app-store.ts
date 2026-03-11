@@ -1,6 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 
-import { fetchTpLinkDeviceByQrCode } from "@/lib/tplink/client";
+import { fetchTpLinkDeviceByQrCode, fetchTpLinkDevices } from "@/lib/tplink/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/client";
 import { slugId } from "@/lib/utils";
 import type {
@@ -21,7 +21,6 @@ import type {
 import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 const INITIAL_BALANCE_ID = "default";
-const DEFAULT_DEVICE_QR_CODES = ["357183410325BEC23", "35718341031F43E43"];
 
 type MaybeStore = ReturnType<typeof getMemoryStore>;
 
@@ -82,25 +81,20 @@ async function loadDevices(taskDevices: DeviceRef[]) {
   const merged = new Map<string, DeviceRef>();
   taskDevices.forEach((device) => merged.set(device.qrCode, device));
 
-  const fetched = await Promise.all(DEFAULT_DEVICE_QR_CODES.map((qrCode) => fetchTpLinkDeviceByQrCode(qrCode).catch(() => null)));
-  for (const device of fetched) {
-    if (device) {
+  try {
+    const devices = await fetchTpLinkDevices();
+    for (const device of devices) {
       merged.set(device.qrCode, device);
+    }
+  } catch {
+    const fetched = await Promise.all(taskDevices.map((device) => fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null)));
+    for (const device of fetched) {
+      if (device) {
+        merged.set(device.qrCode, device);
+      }
     }
   }
 
-  for (const qrCode of DEFAULT_DEVICE_QR_CODES) {
-    if (!merged.has(qrCode)) {
-      merged.set(qrCode, {
-        qrCode,
-        channelId: 1,
-        name: `TP-LINK Device ${qrCode.slice(-4)}`,
-        status: "online",
-        groupName: "默认设备分组",
-        previewImage: "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80"
-      });
-    }
-  }
 
   return Array.from(merged.values());
 }

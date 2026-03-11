@@ -4,6 +4,8 @@ import type { Algorithm, DeviceRef } from "@/lib/types";
 
 const TP_LINK_HOST = "api-smbcloud.tp-link.com.cn";
 const TP_LINK_ENDPOINT = `https://${TP_LINK_HOST}`;
+const DEVICE_PREVIEW_IMAGE =
+  "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 
 async function tpLinkPost<T>(path: string, payload: unknown): Promise<T> {
   if (!hasTpLinkEnv()) {
@@ -43,6 +45,13 @@ interface TpLinkListResponse<T> {
   };
 }
 
+interface TpLinkSingleListResponse<T> {
+  error_code: number;
+  result?: {
+    list?: T[];
+  };
+}
+
 interface TpLinkAlgorithmItem {
   algorithmId: string;
   algorithmName: string;
@@ -50,6 +59,63 @@ interface TpLinkAlgorithmItem {
   latestVersion: string;
   versionList: string[];
   algorithmCategoryList: string[];
+}
+
+interface TpLinkProjectDeviceItem {
+  qrCode?: string;
+  mac?: string;
+  deviceName?: string;
+  deviceStatus?: number;
+  channelId?: number;
+  regionName?: string;
+}
+
+interface TpLinkEntrustDeviceItem {
+  qrCode?: string;
+  mac?: string;
+  deviceName?: string;
+  deviceStatus?: number;
+  channelId?: number;
+  belongEnterpriseName?: string;
+}
+
+function normalizeText(value: string | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function mapTpLinkDeviceStatus(value: number | undefined): DeviceRef["status"] {
+  return value === 1 ? "online" : "offline";
+}
+
+function mapProjectDevice(item: TpLinkProjectDeviceItem): DeviceRef | null {
+  const qrCode = item.qrCode?.trim();
+  if (!qrCode) return null;
+
+  return {
+    qrCode,
+    mac: item.mac,
+    channelId: item.channelId ?? 1,
+    name: normalizeText(item.deviceName, qrCode),
+    status: mapTpLinkDeviceStatus(item.deviceStatus),
+    groupName: normalizeText(item.regionName, "默认分组"),
+    previewImage: DEVICE_PREVIEW_IMAGE
+  };
+}
+
+function mapEntrustDevice(item: TpLinkEntrustDeviceItem, fallbackQrCode?: string): DeviceRef | null {
+  const qrCode = item.qrCode?.trim() || fallbackQrCode?.trim();
+  if (!qrCode) return null;
+
+  return {
+    qrCode,
+    mac: item.mac,
+    channelId: item.channelId ?? 1,
+    name: normalizeText(item.deviceName, qrCode),
+    status: mapTpLinkDeviceStatus(item.deviceStatus),
+    groupName: normalizeText(item.belongEnterpriseName, "TP-LINK 托管设备"),
+    previewImage: DEVICE_PREVIEW_IMAGE
+  };
 }
 
 export async function fetchTpLinkAlgorithms() {
@@ -77,36 +143,74 @@ export async function fetchTpLinkAlgorithms() {
   }));
 }
 
-interface TpLinkDeviceInfoResponse {
-  error_code: number;
-  result?: {
-    qrCode?: string;
-    mac?: string;
-    devName?: string;
-    channelId?: number;
-    groupName?: string;
-    online?: boolean;
-  };
+export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
+  const merged = new Map<string, DeviceRef>();
+  const limit = 100;
+  let start = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (start < total) {
+    const response = await tpLinkPost<TpLinkListResponse<TpLinkProjectDeviceItem>>(
+      "/tums/open/deviceManager/v1/getDeviceListInProjectApplication",
+      {
+        start,
+        limit,
+        filterAnd: {
+          hasChild: 1
+        }
+      }
+    );
+
+    if (response.error_code !== 0) {
+      throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
+    }
+
+    const list = response.result.list ?? [];
+    total = response.result.total ?? list.length;
+
+    for (const item of list) {
+      const device = mapProjectDevice(item);
+      if (device) {
+        merged.set(device.qrCode, device);
+      }
+    }
+
+    if (list.length < limit) {
+      break;
+    }
+
+    start += limit;
+  }
+
+  return Array.from(merged.values());
 }
 
 export async function fetchTpLinkDeviceByQrCode(qrCode: string): Promise<DeviceRef | null> {
-  const response = await tpLinkPost<TpLinkDeviceInfoResponse>("/tums/open/device/v1/getDeviceInfo", {
-    qrCode
-  });
+  try {
+    const response = await tpLinkPost<TpLinkSingleListResponse<TpLinkEntrustDeviceItem>>(
+      "/tums/open/deviceEntrust/v1/getEntrustDeviceInfoByDevList",
+      {
+        devList: [
+          {
+            qrCode,
+            channelId: 1
+          }
+        ]
+      }
+    );
 
-  if (response.error_code !== 0 || !response.result) {
-    return null;
+    if (response.error_code === 0) {
+      const device = mapEntrustDevice(response.result?.list?.[0] ?? {}, qrCode);
+      if (device) {
+        return device;
+      }
+    }
+  } catch {
+    // Fall back to the project application device list below.
   }
 
-  return {
-    qrCode: response.result.qrCode ?? qrCode,
-    mac: response.result.mac,
-    channelId: response.result.channelId ?? 1,
-    name: response.result.devName ?? qrCode,
-    status: response.result.online ? "online" : "offline",
-    groupName: response.result.groupName ?? "TP-LINK 导入设备",
-    previewImage: "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80"
-  };
+  const devices = await fetchTpLinkDevices().catch(() => []);
+  return devices.find((device) => device.qrCode === qrCode) ?? null;
 }
 
 export async function startTpLinkInspectionTask(payload: {
