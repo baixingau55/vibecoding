@@ -113,6 +113,17 @@ function toRegionConfig(regions: RegionShape[]) {
   });
 }
 
+function buildTpLinkDevList(task: InspectionTask) {
+  return task.devices.map((device) => {
+    const regions = task.regionsByQrCode[device.qrCode] ?? [];
+    return {
+      qrCode: device.qrCode,
+      channelId: device.channelId,
+      ...(regions.length > 0 ? { regionConfig: toRegionConfig(regions) } : {})
+    };
+  });
+}
+
 function parseTpLinkTime(value: string | undefined) {
   if (!value || value.length !== 14) {
     return new Date().toISOString();
@@ -374,27 +385,38 @@ export async function executeTask(taskId: string) {
     return simulateTaskExecution(task, chargeUnitsCount);
   }
 
-  await setTpLinkAlgorithmVersions({
+  const versionResponse = await setTpLinkAlgorithmVersions({
     algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
       algorithmId,
       algorithmVersion
     }))
   });
 
+  if (versionResponse.error_code !== 0) {
+    throw new Error(`TP-LINK 算法版本设置失败，error_code=${versionResponse.error_code}`);
+  }
+
+  if ((versionResponse.result?.failList?.length ?? 0) > 0) {
+    const failSummary = versionResponse.result?.failList
+      ?.map((item) => `${item.algorithmId}@${item.algorithmVersion}: ${item.error_code}`)
+      .join("; ");
+    throw new Error(`TP-LINK 算法版本设置部分失败：${failSummary}`);
+  }
+
   const response = await startTpLinkInspectionTask({
     callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
     algorithmIdList: task.algorithmIds,
     type: 1,
-    devList: task.devices.map((device) => ({
-      qrCode: device.qrCode,
-      channelId: device.channelId,
-      regionConfig: toRegionConfig(task.regionsByQrCode[device.qrCode] ?? [])
-    }))
+    devList: buildTpLinkDevList(task)
   });
+
+  if (response.error_code !== 0) {
+    throw new Error(`TP-LINK 启动巡检任务失败，error_code=${response.error_code}`);
+  }
 
   const tpLinkTaskId = response.result?.taskId;
   if (!tpLinkTaskId) {
-    throw new Error("TP-LINK 未返回 taskId。");
+    throw new Error(`TP-LINK ??? taskId???=${JSON.stringify(response)}`);
   }
 
   await chargeUnits(task.id, chargeUnitsCount);
