@@ -272,6 +272,58 @@ export async function getTpLinkInspectionTaskResult(taskId: string) {
   }>("/openapi/aiInspection/v1/getAiInspectionTaskResult", { taskId });
 }
 
+export async function submitTpLinkCaptureVideoTask(payload: {
+  qrCode: string;
+  channelId: number;
+  playbackStartTime: string;
+  playbackEndTime: string;
+  expireDays?: number;
+}) {
+  return tpLinkPost<{
+    error_code: number;
+    result?: { taskId?: string };
+  }>("/vms/open/videoFetchService/v1/submitCaptureVideoTask", {
+    qrCode: payload.qrCode,
+    channelId: payload.channelId,
+    type: 102,
+    playbackStartTime: payload.playbackStartTime,
+    playbackEndTime: payload.playbackEndTime,
+    expireDays: payload.expireDays ?? 1
+  });
+}
+
+export async function getTpLinkVideoTaskInfo(taskId: string) {
+  return tpLinkPost<{
+    error_code: number;
+    result?: {
+      taskId?: string;
+      state?: number;
+      error_code?: number;
+      errorMsg?: string;
+    };
+  }>("/vms/open/videoFetchService/v1/getTaskInfo", { taskId });
+}
+
+export async function getTpLinkVideoTaskFilePage(taskId: string) {
+  return tpLinkPost<{
+    error_code: number;
+    result?: {
+      total?: number;
+      list?: Array<{
+        fileId?: string;
+        urls?: string[];
+        expireTime?: string | null;
+      }>;
+    };
+  }>("/vms/open/videoFetchService/v1/getTaskFilePage", {
+    taskId,
+    pageIndex: 0,
+    pageSize: 10,
+    urlRequired: true,
+    urlTtl: 600
+  });
+}
+
 export async function bootstrapTpLinkMessageSubscription(payload: {
   callbackUrl: string;
   signSecret: string;

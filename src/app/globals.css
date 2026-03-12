@@ -1811,6 +1811,18 @@ button {
 .ai-record-image-wrap img,
 .ai-drawer-media img,
 .ai-message-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.ai-record-image-native,
+.ai-drawer-media-native,
+.ai-message-thumb-native {
+  width: 100%;
+  height: 100%;
+  display: block;
   object-fit: cover;
 }
 

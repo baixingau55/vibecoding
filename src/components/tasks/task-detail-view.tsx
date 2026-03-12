@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -266,7 +265,7 @@ export function TaskDetailView({
             {visibleResults.map((result) => (
               <article key={result.id} className="ai-record-card ai-record-card-detail">
                 <div className="ai-record-image-wrap">
-                  {result.imageUrl ? <Image src={result.imageUrl} alt={algorithmName} fill sizes="280px" /> : <div className="ai-record-image-placeholder" />}
+                  {result.imageUrl ? <img src={result.imageUrl} alt={algorithmName} className="ai-record-image-native" /> : <div className="ai-record-image-placeholder" />}
                 </div>
                 <div className="ai-record-meta">
                   <div>检测结果 <strong className={result.result === "UNQUALIFIED" ? "ai-danger-text" : "ai-success-text"}>{result.result === "UNQUALIFIED" ? "不合格" : "合格"}</strong></div>
@@ -380,14 +379,16 @@ export function TaskDetailView({
             {selectedResult.imageUrl ? (
               <div className="ai-message-drawer-section ai-message-drawer-result">
                 <div className="ai-drawer-media">
-                  <Image src={selectedResult.imageUrl} alt={selectedResult.algorithmId} fill sizes="432px" />
+                  <img src={selectedResult.imageUrl} alt={selectedResult.algorithmId} className="ai-drawer-media-native" />
                 </div>
                 {relatedVideoMedia ? (
                   <Link href={`/api/media/${relatedVideoMedia.id}`} className="ai-button ai-button-light" target="_blank">
-                    查看回放
+                    ????
                   </Link>
                 ) : (
-                  <div className="ai-video-empty">暂无可查看录像</div>
+                  <Link href={`/api/results/${selectedResult.id}/replay`} className="ai-button ai-button-light" target="_blank">
+                    ????
+                  </Link>
                 )}
               </div>
             ) : null}

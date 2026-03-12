@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
@@ -138,7 +137,7 @@ export function MessageCenter({
                   <td>
                     {message.imageUrl ? (
                       <div className="ai-message-thumb">
-                        <Image src={message.imageUrl} alt={message.title} fill sizes="62px" />
+                        <img src={message.imageUrl} alt={message.title} className="ai-message-thumb-native" />
                       </div>
                     ) : (
                       "-"
@@ -275,19 +274,21 @@ export function MessageCenter({
 
               {imageMedia?.url || selectedMessage.imageUrl ? (
                 <div className="ai-drawer-media">
-                  <Image src={imageMedia?.url ?? selectedMessage.imageUrl!} alt={selectedMessage.title} fill sizes="432px" />
+                  <img src={imageMedia?.url ?? selectedMessage.imageUrl!} alt={selectedMessage.title} className="ai-drawer-media-native" />
                 </div>
               ) : null}
 
               {videoMedia ? (
                 <Link href={`/api/media/${videoMedia.id}`} className="ai-button ai-button-light" target="_blank">
-                  查看回放
+                  ????
                 </Link>
               ) : (
-                <div className="ai-video-empty">暂无可查看录像</div>
+                <Link href={`/api/messages/${selectedMessage.id}/replay`} className="ai-button ai-button-light" target="_blank">
+                  ????
+                </Link>
               )}
-            </div>
 
+            </div>
             <div className="ai-drawer-nav">
               <button type="button" disabled={selectedIndex <= 0} onClick={() => setSelectedId(filteredMessages[selectedIndex - 1]?.id ?? "")}>
                 &lt; 上一个
