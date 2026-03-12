@@ -16,8 +16,13 @@ const repeatOptions = [
 ];
 
 const intervalOptions = [
+  { label: "5min", minutes: 5 },
+  { label: "10min", minutes: 10 },
+  { label: "15min", minutes: 15 },
   { label: "30min", minutes: 30 },
+  { label: "45min", minutes: 45 },
   { label: "1h", minutes: 60 },
+  { label: "90min", minutes: 90 },
   { label: "2h", minutes: 120 }
 ];
 

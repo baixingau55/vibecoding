@@ -25,9 +25,81 @@ type TaskInput = Pick<
   "name" | "algorithmIds" | "algorithmVersions" | "devices" | "schedules" | "inspectionRule" | "messageRule" | "regionsByQrCode"
 > & { id?: string };
 
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+
 function calculateTaskStatus(task: TaskInput): InspectionTask["status"] {
   if (task.devices.length === 0) return "config_error";
   return "enabled";
+}
+
+function getShanghaiParts(base: Date) {
+  const shifted = new Date(base.getTime() + SHANGHAI_OFFSET_MS);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth(),
+    day: shifted.getUTCDate(),
+    weekDay: shifted.getUTCDay(),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes()
+  };
+}
+
+function createShanghaiDate(year: number, month: number, day: number, hour: number, minute: number) {
+  return new Date(Date.UTC(year, month, day, hour - 8, minute, 0, 0));
+}
+
+function parseClock(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  return { hour, minute, totalMinutes: hour * 60 + minute };
+}
+
+function getNextRunAt(schedules: InspectionTask["schedules"], from = new Date()) {
+  if (schedules.length === 0) return undefined;
+
+  let next: Date | null = null;
+
+  for (let dayOffset = 0; dayOffset <= 30; dayOffset += 1) {
+    const candidateBase = new Date(from.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+    const parts = getShanghaiParts(candidateBase);
+    const currentMinutes = dayOffset === 0 ? parts.hour * 60 + parts.minute : -1;
+
+    for (const schedule of schedules) {
+      if (!schedule.repeatDays.includes(parts.weekDay)) continue;
+
+      if (schedule.type === "time_point") {
+        const target = parseClock(schedule.startTime);
+        if (dayOffset === 0 && target.totalMinutes < currentMinutes) continue;
+        const candidate = createShanghaiDate(parts.year, parts.month, parts.day, target.hour, target.minute);
+        if (candidate >= from && (!next || candidate < next)) {
+          next = candidate;
+        }
+        continue;
+      }
+
+      if (!schedule.endTime) continue;
+
+      const start = parseClock(schedule.startTime);
+      const end = parseClock(schedule.endTime);
+      const intervalMinutes = schedule.intervalMinutes ?? 30;
+
+      let candidateMinutes = start.totalMinutes;
+      if (dayOffset === 0 && currentMinutes > start.totalMinutes) {
+        const elapsed = currentMinutes - start.totalMinutes;
+        candidateMinutes = start.totalMinutes + Math.ceil(elapsed / intervalMinutes) * intervalMinutes;
+      }
+
+      if (candidateMinutes > end.totalMinutes) continue;
+
+      const candidateHour = Math.floor(candidateMinutes / 60);
+      const candidateMinute = candidateMinutes % 60;
+      const candidate = createShanghaiDate(parts.year, parts.month, parts.day, candidateHour, candidateMinute);
+      if (candidate >= from && (!next || candidate < next)) {
+        next = candidate;
+      }
+    }
+  }
+
+  return next?.toISOString();
 }
 
 function toRegionConfig(regions: RegionShape[]) {
@@ -85,6 +157,23 @@ export async function listTasks() {
   return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+export async function triggerDueTasks() {
+  const tasks = await listTasks();
+  const dueTasks = tasks.filter((task) => task.status === "enabled" && task.nextRunAt && new Date(task.nextRunAt) <= new Date());
+
+  const completed: string[] = [];
+  for (const task of dueTasks) {
+    try {
+      await executeTask(task.id);
+      completed.push(task.id);
+    } catch {
+      // Keep due-task trigger resilient; failures are reflected in task/run state.
+    }
+  }
+
+  return completed;
+}
+
 export async function getTaskById(id: string) {
   const snapshot = await getAppSnapshot();
   const task = snapshot.tasks.find((item) => item.id === id) ?? null;
@@ -120,7 +209,7 @@ export async function upsertTask(input: TaskInput) {
     configErrorReason: status === "config_error" ? "任务中已无巡检设备" : undefined,
     createdAt: previous?.createdAt ?? now,
     updatedAt: now,
-    nextRunAt: status === "enabled" ? new Date(Date.now() + 1000 * 60 * 30).toISOString() : undefined,
+    nextRunAt: status === "enabled" ? getNextRunAt(input.schedules, new Date()) : undefined,
     closedAt: previous?.closedAt
   };
 
@@ -256,7 +345,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
     ...task,
     status: "enabled",
     updatedAt: new Date().toISOString(),
-    nextRunAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+    nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 60 * 1000))
   });
 
   if (failures.length > 0) {
@@ -329,7 +418,7 @@ export async function executeTask(taskId: string) {
     ...task,
     status: "running",
     updatedAt: new Date().toISOString(),
-    nextRunAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+    nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 60 * 1000))
   });
 
   return { run, results: [], failures: [], messages: [] };
@@ -339,6 +428,10 @@ export async function refreshTaskResults(taskId: string) {
   const details = await getTaskById(taskId);
   if (!details) {
     throw new Error("Task not found.");
+  }
+
+  if (details.task.status === "enabled") {
+    return executeTask(taskId);
   }
 
   const targetRun = details.runs.find((item) => item.tpLinkTaskId && item.status === "running");
