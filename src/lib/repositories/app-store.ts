@@ -21,6 +21,8 @@ import type {
 import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 const INITIAL_BALANCE_ID = "default";
+const FALLBACK_DEVICE_PREVIEW =
+  "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 
 type MaybeStore = ReturnType<typeof getMemoryStore>;
 
@@ -93,6 +95,22 @@ async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
       if (device) {
         merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device);
       }
+    }
+  }
+
+  for (const qrCode of resultQrCodes) {
+    const hasQrCode = Array.from(merged.values()).some((device) => device.qrCode === qrCode);
+    if (!hasQrCode) {
+      merged.set(`result:${qrCode}`, {
+        qrCode,
+        channelId: 1,
+        name: qrCode,
+        status: "online",
+        groupName: "历史抓拍设备",
+        previewImage: FALLBACK_DEVICE_PREVIEW,
+        profileId: undefined,
+        profileName: undefined
+      });
     }
   }
 
@@ -224,7 +242,14 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       );
 
       task.devices = fallbackQrCodes
-        .map((qrCode) => deviceByQrCode.get(qrCode))
+        .map((qrCode) => deviceByQrCode.get(qrCode) ?? {
+          qrCode,
+          channelId: 1,
+          name: qrCode,
+          status: "online" as const,
+          groupName: "历史抓拍设备",
+          previewImage: FALLBACK_DEVICE_PREVIEW
+        })
         .filter((device): device is DeviceRef => Boolean(device));
     }
   }
