@@ -59,6 +59,7 @@ async function tpLinkPostAcrossProfiles<T>(
 ): Promise<{ profileId: TpLinkProfileId; response: T }> {
   const profiles = getTpLinkProfiles();
   let lastError: Error | null = null;
+  let lastInvalidResponse: { profileId: TpLinkProfileId; response: T } | null = null;
 
   for (const profile of profiles) {
     try {
@@ -66,9 +67,14 @@ async function tpLinkPostAcrossProfiles<T>(
       if (predicate(response)) {
         return { profileId: profile.id, response };
       }
+      lastInvalidResponse = { profileId: profile.id, response };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Unknown TP-LINK error.");
     }
+  }
+
+  if (lastInvalidResponse) {
+    throw new Error(`No TP-LINK profile returned a valid response. Last response from ${lastInvalidResponse.profileId}: ${JSON.stringify(lastInvalidResponse.response)}`);
   }
 
   if (lastError) throw lastError;
