@@ -1,4 +1,5 @@
 export type AlgorithmResult = "QUALIFIED" | "UNQUALIFIED" | "UNAVAILABLE";
+export type TpLinkProfileId = string;
 
 export type TaskStatus =
   | "draft"
@@ -22,6 +23,8 @@ export interface Algorithm {
   categories: string[];
   active: boolean;
   source: "tplink" | "mock";
+  profileIds?: TpLinkProfileId[];
+  profileNames?: string[];
 }
 
 export interface ServiceBalance {
@@ -58,6 +61,8 @@ export interface DeviceRef {
   status: "online" | "offline";
   groupName: string;
   previewImage: string;
+  profileId?: TpLinkProfileId;
+  profileName?: string;
 }
 
 export interface RegionPoint {
@@ -118,6 +123,7 @@ export interface InspectionRun {
   chargedUnits: number;
   refundedUnits: number;
   tpLinkTaskId?: string;
+  profileId?: TpLinkProfileId;
 }
 
 export interface InspectionResult {
@@ -131,6 +137,7 @@ export interface InspectionResult {
   imageUrl: string;
   imageTime: string;
   result: AlgorithmResult;
+  profileId?: TpLinkProfileId;
 }
 
 export interface InspectionFailure {
@@ -160,6 +167,7 @@ export interface MessageItem {
   imageUrl?: string;
   imageId?: string;
   videoTaskId?: string;
+  profileId?: TpLinkProfileId;
 }
 
 export interface MediaAsset {

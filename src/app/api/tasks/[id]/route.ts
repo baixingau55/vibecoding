@@ -18,14 +18,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const body = (await request.json()) as Partial<InspectionTask>;
   const task = await upsertTask({
     id: params.id,
-    name: body.name ?? "未命名巡检任务",
-    algorithmIds: body.algorithmIds ?? [],
-    algorithmVersions: body.algorithmVersions ?? {},
-    devices: body.devices ?? [],
-    schedules: body.schedules ?? [],
-    inspectionRule: body.inspectionRule ?? { resultMode: "detect_target" },
-    messageRule: body.messageRule ?? { enabled: true, triggerMode: "every_unqualified", continuousCount: 3 },
-    regionsByQrCode: body.regionsByQrCode ?? {}
+    name: body.name,
+    algorithmIds: body.algorithmIds,
+    algorithmVersions: body.algorithmVersions,
+    devices: body.devices,
+    schedules: body.schedules,
+    inspectionRule: body.inspectionRule,
+    messageRule: body.messageRule,
+    regionsByQrCode: body.regionsByQrCode
   });
 
   return NextResponse.json({ task });

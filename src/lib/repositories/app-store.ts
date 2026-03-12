@@ -77,20 +77,21 @@ async function ensureBaseRows() {
   return true;
 }
 
-async function loadDevices(taskDevices: DeviceRef[]) {
+async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   const merged = new Map<string, DeviceRef>();
-  taskDevices.forEach((device) => merged.set(device.qrCode, device));
+  taskDevices.forEach((device) => merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device));
 
   try {
     const devices = await fetchTpLinkDevices();
     for (const device of devices) {
-      merged.set(device.qrCode, device);
+      merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device);
     }
   } catch {
-    const fetched = await Promise.all(taskDevices.map((device) => fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null)));
+    const qrCodes = Array.from(new Set([...taskDevices.map((device) => device.qrCode), ...resultQrCodes]));
+    const fetched = await Promise.all(qrCodes.map((qrCode) => fetchTpLinkDeviceByQrCode(qrCode).catch(() => null)));
     for (const device of fetched) {
       if (device) {
-        merged.set(device.qrCode, device);
+        merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device);
       }
     }
   }
@@ -175,15 +176,15 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
   for (const row of taskDeviceRes.data ?? []) {
     const task = tasksById.get(row.task_id);
     if (!task) continue;
-    task.devices.push({
-      qrCode: row.qr_code,
-      mac: row.mac ?? undefined,
-      channelId: row.channel_id,
-      name: row.name,
-      status: row.status,
-      groupName: row.group_name,
-      previewImage: row.preview_image
-    });
+      task.devices.push({
+        qrCode: row.qr_code,
+        mac: row.mac ?? undefined,
+        channelId: row.channel_id,
+        name: row.name,
+        status: row.status,
+        groupName: row.group_name,
+        previewImage: row.preview_image
+      });
   }
 
   for (const row of taskScheduleRes.data ?? []) {
@@ -205,7 +206,28 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
   }
 
   const tasks = Array.from(tasksById.values());
-  const devices = await loadDevices(tasks.flatMap((task) => task.devices));
+  const resultQrCodes = Array.from(new Set((resultRes.data ?? []).map((row) => row.qr_code).filter(Boolean)));
+  const devices = await loadDevices(tasks.flatMap((task) => task.devices), resultQrCodes);
+  const deviceByQrCode = new Map(devices.map((device) => [device.qrCode, device] as const));
+
+  for (const task of tasks) {
+    task.devices = task.devices.map((device) => ({ ...device, ...(deviceByQrCode.get(device.qrCode) ?? {}) }));
+
+    if (task.devices.length === 0) {
+      const fallbackQrCodes = Array.from(
+        new Set(
+          (resultRes.data ?? [])
+            .filter((row) => row.task_id === task.id)
+            .map((row) => row.qr_code)
+            .filter(Boolean)
+        )
+      );
+
+      task.devices = fallbackQrCodes
+        .map((qrCode) => deviceByQrCode.get(qrCode))
+        .filter((device): device is DeviceRef => Boolean(device));
+    }
+  }
 
   return {
     serviceBalance: balanceRes.data
@@ -401,9 +423,9 @@ export async function getAppStore() {
             name: device.name,
             status: device.status,
             group_name: device.groupName,
-            preview_image: device.previewImage
-          }))
-        );
+          preview_image: device.previewImage
+        }))
+      );
         if (error) throw error;
       }
 

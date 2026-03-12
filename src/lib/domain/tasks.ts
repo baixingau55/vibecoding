@@ -1,15 +1,16 @@
+import env from "@/lib/env";
+import { getAlgorithms } from "@/lib/domain/algorithms";
+import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
+import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
 import {
   bootstrapTpLinkMessageSubscription,
+  fetchTpLinkDeviceByQrCode,
   getTpLinkInspectionTaskResult,
   setTpLinkAlgorithmVersions,
   startTpLinkInspectionTask
 } from "@/lib/tplink/client";
-import env from "@/lib/env";
 import { slugId } from "@/lib/utils";
-
-import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
-import { getAppSnapshot } from "@/lib/domain/store";
 import type {
   InspectionFailure,
   InspectionResult,
@@ -27,7 +28,7 @@ type TaskInput = Pick<
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
-function calculateTaskStatus(task: TaskInput): InspectionTask["status"] {
+function calculateTaskStatus(task: Pick<InspectionTask, "devices">): InspectionTask["status"] {
   if (task.devices.length === 0) return "config_error";
   return "enabled";
 }
@@ -159,8 +160,48 @@ function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: In
     createdAt: result.imageTime,
     imageUrl: result.imageUrl,
     imageId: result.imageUrl ? slugId("image") : undefined,
-    videoTaskId: undefined
+    videoTaskId: undefined,
+    profileId: result.profileId
   };
+}
+
+function mergeTaskInput(previous: InspectionTask | null, input: Partial<TaskInput> & { id?: string }) {
+  return {
+    id: input.id ?? previous?.id,
+    name: input.name ?? previous?.name ?? "未命名巡检任务",
+    algorithmIds: input.algorithmIds ?? previous?.algorithmIds ?? [],
+    algorithmVersions: input.algorithmVersions ?? previous?.algorithmVersions ?? {},
+    devices: input.devices ?? previous?.devices ?? [],
+    schedules: input.schedules ?? previous?.schedules ?? [],
+    inspectionRule: input.inspectionRule ?? previous?.inspectionRule ?? { resultMode: "detect_target" as const },
+    messageRule:
+      input.messageRule ??
+      previous?.messageRule ?? { enabled: true, triggerMode: "every_unqualified" as const, continuousCount: 3 },
+    regionsByQrCode: input.regionsByQrCode ?? previous?.regionsByQrCode ?? {}
+  };
+}
+
+async function resolveTaskDevicesForExecution(task: InspectionTask) {
+  return Promise.all(
+    task.devices.map(async (device) => {
+      if (device.profileId) return device;
+      const fetched = await fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null);
+      return fetched ? { ...device, ...fetched } : device;
+    })
+  );
+}
+
+function groupDevicesByProfile(devices: InspectionTask["devices"]) {
+  const grouped = new Map<string, InspectionTask["devices"]>();
+
+  for (const device of devices) {
+    const profileId = device.profileId ?? "primary";
+    const bucket = grouped.get(profileId) ?? [];
+    bucket.push(device);
+    grouped.set(profileId, bucket);
+  }
+
+  return grouped;
 }
 
 export async function listTasks() {
@@ -199,28 +240,29 @@ export async function getTaskById(id: string) {
   };
 }
 
-export async function upsertTask(input: TaskInput) {
+export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
   const store = await getAppStore();
   const snapshot = await store.snapshot();
   const now = new Date().toISOString();
-  const previous = input.id ? snapshot.tasks.find((item) => item.id === input.id) : null;
-  const status = calculateTaskStatus(input);
+  const previous = input.id ? snapshot.tasks.find((item) => item.id === input.id) ?? null : null;
+  const merged = mergeTaskInput(previous, input);
+  const status = calculateTaskStatus(merged);
 
   const task: InspectionTask = {
-    id: input.id ?? slugId("task"),
-    name: input.name,
-    algorithmIds: input.algorithmIds,
-    algorithmVersions: input.algorithmVersions,
-    devices: input.devices,
-    schedules: input.schedules,
-    inspectionRule: input.inspectionRule,
-    messageRule: input.messageRule,
-    regionsByQrCode: input.regionsByQrCode,
+    id: merged.id ?? slugId("task"),
+    name: merged.name,
+    algorithmIds: merged.algorithmIds,
+    algorithmVersions: merged.algorithmVersions,
+    devices: merged.devices,
+    schedules: merged.schedules,
+    inspectionRule: merged.inspectionRule,
+    messageRule: merged.messageRule,
+    regionsByQrCode: merged.regionsByQrCode,
     status,
     configErrorReason: status === "config_error" ? "任务中已无巡检设备" : undefined,
     createdAt: previous?.createdAt ?? now,
     updatedAt: now,
-    nextRunAt: status === "enabled" ? getNextRunAt(input.schedules, new Date()) : undefined,
+    nextRunAt: status === "enabled" ? getNextRunAt(merged.schedules, new Date()) : undefined,
     closedAt: previous?.closedAt
   };
 
@@ -291,7 +333,8 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
     failedChecks: task.devices.length > 1 ? 1 : 0,
     chargedUnits: chargeUnitsCount,
     refundedUnits: task.devices.length > 1 ? 1 : 0,
-    tpLinkTaskId: slugId("tplink")
+    tpLinkTaskId: slugId("tplink"),
+    profileId: task.devices[0]?.profileId
   };
 
   const results: InspectionResult[] = [
@@ -305,7 +348,8 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
       algorithmVersion: task.algorithmVersions[task.algorithmIds[0]] ?? "latest",
       imageUrl: task.devices[0].previewImage,
       imageTime: startedAt,
-      result: "UNQUALIFIED"
+      result: "UNQUALIFIED",
+      profileId: task.devices[0].profileId
     }
   ];
 
@@ -325,9 +369,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
         ]
       : [];
 
-  const messages = results
-    .map((result) => buildUnqualifiedMessage(task, run.id, result))
-    .filter((item): item is MessageItem => Boolean(item));
+  const messages = results.map((result) => buildUnqualifiedMessage(task, run.id, result)).filter(Boolean) as MessageItem[];
 
   const mediaAssets: MediaAsset[] = messages.flatMap((message) =>
     message.imageId && message.imageUrl
@@ -375,75 +417,107 @@ export async function executeTask(taskId: string) {
     throw new Error(task.configErrorReason ?? "任务配置异常，无法执行。");
   }
 
+  const resolvedDevices = await resolveTaskDevicesForExecution(task);
   const balance = await getServiceBalance();
-  const chargeUnitsCount = task.devices.length * task.algorithmIds.length;
+  const chargeUnitsCount = resolvedDevices.length * task.algorithmIds.length;
   if (balance.remaining < chargeUnitsCount) {
     throw new Error("剩余分析次数不足，任务无法执行。");
   }
 
   if (process.env.VITEST || process.env.NODE_ENV === "test" || !env.tpLinkAk || !env.tpLinkSk) {
-    return simulateTaskExecution(task, chargeUnitsCount);
+    return simulateTaskExecution({ ...task, devices: resolvedDevices }, chargeUnitsCount);
   }
 
-  const versionResponse = await setTpLinkAlgorithmVersions({
-    algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
-      algorithmId,
-      algorithmVersion
-    }))
-  });
-
-  if (versionResponse.error_code !== 0) {
-    throw new Error(`TP-LINK 算法版本设置失败，error_code=${versionResponse.error_code}`);
-  }
-
-  if ((versionResponse.result?.failList?.length ?? 0) > 0) {
-    const failSummary = versionResponse.result?.failList
-      ?.map((item) => `${item.algorithmId}@${item.algorithmVersion}: ${item.error_code}`)
-      .join("; ");
-    throw new Error(`TP-LINK 算法版本设置部分失败：${failSummary}`);
-  }
-
-  const response = await startTpLinkInspectionTask({
-    callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
-    algorithmIdList: task.algorithmIds,
-    type: 1,
-    devList: buildTpLinkDevList(task)
-  });
-
-  if (response.error_code !== 0) {
-    throw new Error(`TP-LINK 启动巡检任务失败，error_code=${response.error_code}`);
-  }
-
-  const tpLinkTaskId = response.result?.taskId;
-  if (!tpLinkTaskId) {
-    throw new Error(`TP-LINK ??? taskId???=${JSON.stringify(response)}`);
-  }
+  const algorithms = await getAlgorithms();
+  const algorithmById = new Map(algorithms.map((algorithm) => [algorithm.id, algorithm] as const));
+  const deviceGroups = groupDevicesByProfile(resolvedDevices);
 
   await chargeUnits(task.id, chargeUnitsCount);
 
-  const run: InspectionRun = {
-    id: slugId("run"),
-    taskId: task.id,
-    startedAt: new Date().toISOString(),
-    status: "running",
-    totalChecks: chargeUnitsCount,
-    successfulChecks: 0,
-    failedChecks: 0,
-    chargedUnits: chargeUnitsCount,
-    refundedUnits: 0,
-    tpLinkTaskId
-  };
+  try {
+    const store = await getAppStore();
+    const runs: InspectionRun[] = [];
 
-  const store = await getAppStore();
-  await store.addRun(run);
-  await store.upsertTask({
-    ...task,
-    status: "running",
-    updatedAt: new Date().toISOString(),
-    nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 60 * 1000))
-  });
+    for (const [profileId, profileDevices] of deviceGroups) {
+      const unsupportedAlgorithms = task.algorithmIds.filter((algorithmId) => {
+        const algorithm = algorithmById.get(algorithmId);
+        return algorithm?.profileIds?.length ? !algorithm.profileIds.includes(profileId) : false;
+      });
 
-  return { run, results: [], failures: [], messages: [] };
+      if (unsupportedAlgorithms.length > 0) {
+        throw new Error(`账号 ${profileId} 未开通算法：${unsupportedAlgorithms.join("、")}`);
+      }
+
+      const versionResponse = await setTpLinkAlgorithmVersions(
+        {
+          algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
+            algorithmId,
+            algorithmVersion
+          }))
+        },
+        profileId
+      );
+
+      if (versionResponse.error_code !== 0) {
+        throw new Error(`TP-LINK 算法版本设置失败，profile=${profileId}，error_code=${versionResponse.error_code}`);
+      }
+
+      if ((versionResponse.result?.failList?.length ?? 0) > 0) {
+        const failSummary = versionResponse.result?.failList
+          ?.map((item) => `${item.algorithmId}@${item.algorithmVersion}: ${item.error_code}`)
+          .join("; ");
+        throw new Error(`TP-LINK 算法版本设置部分失败，profile=${profileId}，${failSummary}`);
+      }
+
+      const response = await startTpLinkInspectionTask(
+        {
+          callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
+          algorithmIdList: task.algorithmIds,
+          type: 1,
+          devList: buildTpLinkDevList({ ...task, devices: profileDevices })
+        },
+        profileId
+      );
+
+      if (response.error_code !== 0) {
+        throw new Error(`TP-LINK 启动巡检任务失败，profile=${profileId}，error_code=${response.error_code}`);
+      }
+
+      if (!response.result?.taskId) {
+        throw new Error(`TP-LINK 未返回 taskId，profile=${profileId}，响应=${JSON.stringify(response)}`);
+      }
+
+      const run: InspectionRun = {
+        id: slugId("run"),
+        taskId: task.id,
+        startedAt: new Date().toISOString(),
+        status: "running",
+        totalChecks: profileDevices.length * task.algorithmIds.length,
+        successfulChecks: 0,
+        failedChecks: 0,
+        chargedUnits: profileDevices.length * task.algorithmIds.length,
+        refundedUnits: 0,
+        tpLinkTaskId: response.result.taskId,
+        profileId
+      };
+
+      await store.addRun(run);
+      runs.push(run);
+    }
+
+    await store.upsertTask({
+      ...task,
+      devices: resolvedDevices,
+      status: "running",
+      updatedAt: new Date().toISOString(),
+      nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 60 * 1000))
+    });
+
+    return { run: runs[0], runs, results: [], failures: [], messages: [] };
+  } catch (error) {
+    await refundUnits(task.id, chargeUnitsCount);
+    throw error;
+  }
 }
 
 export async function refreshTaskResults(taskId: string) {
@@ -456,24 +530,29 @@ export async function refreshTaskResults(taskId: string) {
     return executeTask(taskId);
   }
 
-  const targetRun = details.runs.find((item) => item.tpLinkTaskId && item.status === "running");
-  if (!targetRun?.tpLinkTaskId) {
+  const targetRuns = details.runs.filter((item) => item.tpLinkTaskId && item.status === "running");
+  if (targetRuns.length === 0) {
     return { ok: true, skipped: true, reason: "No running TP-LINK task." };
   }
 
-  const response = await getTpLinkInspectionTaskResult(targetRun.tpLinkTaskId);
-  const resultList =
-    response.result?.taskResult?.map((item) => ({
-      qrCode: item.qrCode,
-      mac: item.mac,
-      channelId: item.channelId,
-      imageUrl: item.imageUrl,
-      imageTime: item.imageTime,
-      algorithmId: item.algorithmId,
-      algorithmResult: item.algorithmResult
-    })) ?? [];
+  const callbackResults = [];
+  for (const targetRun of targetRuns) {
+    const response = await getTpLinkInspectionTaskResult(targetRun.tpLinkTaskId!, targetRun.profileId);
+    const resultList =
+      response.result?.taskResult?.map((item) => ({
+        qrCode: item.qrCode,
+        mac: item.mac,
+        channelId: item.channelId,
+        imageUrl: item.imageUrl,
+        imageTime: item.imageTime,
+        algorithmId: item.algorithmId,
+        algorithmResult: item.algorithmResult
+      })) ?? [];
 
-  return handleTpLinkTaskCallback({ taskId: targetRun.tpLinkTaskId, resultList });
+    callbackResults.push(await handleTpLinkTaskCallback({ taskId: targetRun.tpLinkTaskId!, resultList }));
+  }
+
+  return { ok: true, callbacks: callbackResults };
 }
 
 export async function handleTpLinkTaskCallback(payload: {
@@ -532,7 +611,8 @@ export async function handleTpLinkTaskCallback(payload: {
       algorithmVersion: task.algorithmVersions[item.algorithmId] ?? "latest",
       imageUrl: item.imageUrl?.trim() ?? "",
       imageTime: parseTpLinkTime(item.imageTime),
-      result: item.algorithmResult
+      result: item.algorithmResult,
+      profileId: run.profileId
     };
     results.push(result);
 
@@ -575,9 +655,12 @@ export async function handleTpLinkTaskCallback(payload: {
     await store.addMedia(asset);
   }
   await store.updateRun(finalRun);
+  const hasOtherRunningRuns = snapshot.runs.some(
+    (item) => item.taskId === task.id && item.id !== run.id && item.status === "running"
+  );
   await store.upsertTask({
     ...task,
-    status: "enabled",
+    status: hasOtherRunningRuns ? "running" : "enabled",
     updatedAt: new Date().toISOString()
   });
 

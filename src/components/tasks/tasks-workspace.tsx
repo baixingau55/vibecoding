@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,18 +15,17 @@ function cn(...parts: Array<string | false | null | undefined>) {
 function getStatusMeta(task: InspectionTask) {
   switch (task.status) {
     case "disabled":
-      return { text: "任务已关闭", dot: "#B3B3B3", issue: "", previewTone: "neutral" as const };
+      return { text: "任务已关闭", dot: "#B3B3B3", issue: "" };
     case "config_error":
       return {
         text: "任务异常",
         dot: "#FFC400",
-        issue: task.configErrorReason ?? "任务配置异常",
-        previewTone: "danger" as const
+        issue: task.configErrorReason ?? "任务配置异常"
       };
     case "running":
-      return { text: "执行中", dot: "#1785E6", issue: "", previewTone: "neutral" as const };
+      return { text: "执行中", dot: "#1785E6", issue: "" };
     default:
-      return { text: "任务已开启", dot: "#24B354", issue: "", previewTone: "success" as const };
+      return { text: "任务已开启", dot: "#24B354", issue: "" };
   }
 }
 
@@ -35,12 +33,14 @@ export function TasksWorkspace({
   balance,
   purchaseHistory,
   algorithms,
-  tasks
+  tasks,
+  previewByTaskId
 }: {
   balance: ServiceBalance;
   purchaseHistory: PurchaseRecord[];
   algorithms: Algorithm[];
   tasks: InspectionTask[];
+  previewByTaskId: Record<string, Array<{ qrCode: string; imageUrl: string }>>;
 }) {
   const router = useRouter();
   const [showConfigOnly, setShowConfigOnly] = useState(false);
@@ -172,12 +172,7 @@ export function TasksWorkspace({
               </select>
             </label>
 
-            <input
-              className="ai-input ai-input-search ai-toolbar-search"
-              placeholder="任务名称/算法名称"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <input className="ai-input ai-input-search ai-toolbar-search" placeholder="任务名称/算法名称" value={query} onChange={(event) => setQuery(event.target.value)} />
 
             <button type="button" className="ai-button ai-button-light ai-toolbar-button" onClick={() => router.refresh()}>
               刷新
@@ -200,7 +195,9 @@ export function TasksWorkspace({
         <section className="ai-task-grid ai-task-grid-ui">
           {visibleTasks.map((task) => {
             const status = getStatusMeta(task);
-            const previewDevices = task.devices.slice(0, 3);
+            const previewCaptures = previewByTaskId[task.id] ?? [];
+            const previewDevices = task.devices.slice(0, 3).map((device) => ({ qrCode: device.qrCode, imageUrl: device.previewImage }));
+            const previews = previewCaptures.length > 0 ? previewCaptures : previewDevices;
 
             return (
               <article key={task.id} className={cn("ai-task-card ai-task-card-ui", activeMenuTaskId === task.id && "ai-task-card-menu-open")}>
@@ -227,12 +224,12 @@ export function TasksWorkspace({
                 <div className="ai-task-preview-box ai-task-preview-box-ui">
                   <div className="ai-task-preview-label">任务执行完成次数：{task.status === "running" ? "执行中" : "查看详情"}</div>
                   <div className="ai-task-preview-grid ai-task-preview-grid-ui">
-                    {previewDevices.length === 0 ? (
+                    {previews.length === 0 ? (
                       <div className="ai-task-preview-empty">等待巡检</div>
                     ) : (
-                      previewDevices.map((device) => (
-                        <div key={device.qrCode} className="ai-task-preview-item ai-task-preview-item-ui">
-                          <Image src={device.previewImage} alt={device.name} fill sizes="88px" />
+                      previews.map((item) => (
+                        <div key={`${task.id}-${item.qrCode}-${item.imageUrl}`} className="ai-task-preview-item ai-task-preview-item-ui">
+                          <img src={item.imageUrl} alt={task.name} className="ai-task-preview-native" />
                         </div>
                       ))
                     )}
@@ -303,9 +300,7 @@ export function TasksWorkspace({
                       -
                     </button>
                     <span>{purchaseCount}</span>
-                    <button type="button" onClick={() => setPurchaseCount((current) => current + 1)}>
-                      +
-                    </button>
+                    <button type="button" onClick={() => setPurchaseCount((current) => current + 1)}>+</button>
                   </div>
                   <span>千次</span>
                 </div>

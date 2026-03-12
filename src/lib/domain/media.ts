@@ -51,7 +51,7 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
     playbackStartTime: formatTpLinkDateTime(start),
     playbackEndTime: formatTpLinkDateTime(end),
     expireDays: 1
-  });
+  }, result.profileId);
 
   if (submitResponse.error_code !== 0 || !submitResponse.result?.taskId) {
     throw new Error(`TP-LINK 回放任务提交失败，响应=${JSON.stringify(submitResponse)}`);
@@ -59,14 +59,14 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
 
   const taskId = submitResponse.result.taskId;
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const info = await getTpLinkVideoTaskInfo(taskId);
+    const info = await getTpLinkVideoTaskInfo(taskId, result.profileId);
     if (info.error_code !== 0) {
       throw new Error(`TP-LINK 回放任务查询失败，error_code=${info.error_code}`);
     }
 
     const state = info.result?.state;
     if (state === 10) {
-      const files = await getTpLinkVideoTaskFilePage(taskId);
+      const files = await getTpLinkVideoTaskFilePage(taskId, result.profileId);
       if (files.error_code !== 0) {
         throw new Error(`TP-LINK 回放文件查询失败，error_code=${files.error_code}`);
       }
