@@ -144,45 +144,59 @@ export async function fetchTpLinkAlgorithms() {
 }
 
 export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
-  const merged = new Map<string, DeviceRef>();
-  const limit = 100;
-  let start = 0;
-  let total = Number.POSITIVE_INFINITY;
+  const endpoints = [
+    "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
+    "/tums/open/deviceManager/v1/getDeviceListInProjectApplication"
+  ] as const;
 
-  while (start < total) {
-    const response = await tpLinkPost<TpLinkListResponse<TpLinkProjectDeviceItem>>(
-      "/tums/open/deviceManager/v1/getDeviceListInProjectApplication",
-      {
-        start,
-        limit,
-        filterAnd: {
-          hasChild: 1
+  let lastError: Error | null = null;
+
+  for (const path of endpoints) {
+    try {
+      const merged = new Map<string, DeviceRef>();
+      const limit = 100;
+      let start = 0;
+      let total = Number.POSITIVE_INFINITY;
+
+      while (start < total) {
+        const response = await tpLinkPost<TpLinkListResponse<TpLinkProjectDeviceItem>>(path, {
+          start,
+          limit,
+          filterAnd: {
+            hasChild: 1
+          }
+        });
+
+        if (response.error_code !== 0) {
+          throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
         }
+
+        const list = response.result.list ?? [];
+        total = response.result.total ?? list.length;
+
+        for (const item of list) {
+          const device = mapProjectDevice(item);
+          if (device) {
+            merged.set(device.qrCode, device);
+          }
+        }
+
+        if (list.length < limit) {
+          break;
+        }
+
+        start += limit;
       }
-    );
 
-    if (response.error_code !== 0) {
-      throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
-    }
-
-    const list = response.result.list ?? [];
-    total = response.result.total ?? list.length;
-
-    for (const item of list) {
-      const device = mapProjectDevice(item);
-      if (device) {
-        merged.set(device.qrCode, device);
+      if (merged.size > 0) {
+        return Array.from(merged.values());
       }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
     }
-
-    if (list.length < limit) {
-      break;
-    }
-
-    start += limit;
   }
 
-  return Array.from(merged.values());
+  throw lastError ?? new Error("TP-LINK device fetch returned no devices.");
 }
 
 export async function fetchTpLinkDeviceByQrCode(qrCode: string): Promise<DeviceRef | null> {
