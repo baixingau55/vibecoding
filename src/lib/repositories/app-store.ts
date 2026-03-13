@@ -148,6 +148,26 @@ function composeTasks(
     task.regionsByQrCode[row.qr_code] = (row.regions ?? []) as RegionShape[];
   }
 
+  for (const task of tasksById.values()) {
+    task.devices = Array.from(
+      new Map(task.devices.map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)).values()
+    );
+    task.schedules = Array.from(
+      new Map(
+        task.schedules.map((schedule) => [
+          JSON.stringify({
+            type: schedule.type,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime ?? "",
+            repeatDays: [...schedule.repeatDays].sort((a, b) => a - b),
+            intervalMinutes: schedule.intervalMinutes ?? null
+          }),
+          schedule
+        ] as const)
+      ).values()
+    );
+  }
+
   return Array.from(tasksById.values());
 }
 
