@@ -1,17 +1,36 @@
+import { unstable_cache } from "next/cache";
+
+import { CACHE_TAGS, revalidateBalanceReadModels } from "@/lib/domain/cache-tags";
 import { getAppStore } from "@/lib/repositories/app-store";
 import { slugId } from "@/lib/utils";
 
 import { getAppSnapshot } from "@/lib/domain/store";
 import type { PurchaseRecord, ServiceBalance } from "@/lib/types";
 
+const getCachedBalance = unstable_cache(
+  async () => {
+    const snapshot = await getAppSnapshot({ includeDevices: false });
+    return snapshot.serviceBalance;
+  },
+  ["service-balance"],
+  { revalidate: 5, tags: [CACHE_TAGS.balance] }
+);
+
+const getCachedPurchaseHistory = unstable_cache(
+  async () => {
+    const snapshot = await getAppSnapshot({ includeDevices: false });
+    return snapshot.purchaseRecords;
+  },
+  ["purchase-history"],
+  { revalidate: 5, tags: [CACHE_TAGS.balance] }
+);
+
 export async function getServiceBalance() {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
-  return snapshot.serviceBalance;
+  return getCachedBalance();
 }
 
 export async function getPurchaseHistory() {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
-  return snapshot.purchaseRecords;
+  return getCachedPurchaseHistory();
 }
 
 export async function purchaseServiceUnits(input: { amount: number; accountName?: string; note?: string }) {
@@ -44,6 +63,7 @@ export async function purchaseServiceUnits(input: { amount: number; accountName?
   };
 
   await store.addPurchase(record, ledger, nextBalance);
+  revalidateBalanceReadModels();
   return { balance: nextBalance, record };
 }
 
@@ -58,6 +78,7 @@ export async function chargeUnits(taskId: string, amount: number) {
   };
 
   await store.setBalance(nextBalance);
+  revalidateBalanceReadModels();
   return nextBalance;
 }
 
@@ -72,5 +93,6 @@ export async function refundUnits(taskId: string, amount: number) {
   };
 
   await store.setBalance(nextBalance);
+  revalidateBalanceReadModels();
   return nextBalance;
 }

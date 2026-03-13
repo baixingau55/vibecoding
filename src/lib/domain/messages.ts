@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+
+import { CACHE_TAGS, revalidateMessageReadModels } from "@/lib/domain/cache-tags";
 import { getAppStore } from "@/lib/repositories/app-store";
 import { getAppSnapshot } from "@/lib/domain/store";
 import type { MediaAsset, MessageItem } from "@/lib/types";
@@ -38,24 +41,40 @@ function normalizeList(payload: Record<string, unknown>) {
   return [payload];
 }
 
+const getCachedMessages = unstable_cache(
+  async () => {
+    const store = await getAppStore();
+    if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
+      const { messages } = await store.getMessagesData();
+      return messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    const snapshot = await store.snapshot(false);
+    return snapshot.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  ["messages-list"],
+  { revalidate: 5, tags: [CACHE_TAGS.messages] }
+);
+
+const getCachedMessageById = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
+      const { messages } = await store.getMessagesData();
+      return messages.find((item) => item.id === id) ?? null;
+    }
+    const snapshot = await store.snapshot(false);
+    return snapshot.messages.find((item) => item.id === id) ?? null;
+  },
+  ["message-by-id"],
+  { revalidate: 5, tags: [CACHE_TAGS.messages] }
+);
+
 export async function getMessages() {
-  const store = await getAppStore();
-  if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
-    const { messages } = await store.getMessagesData();
-    return messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-  const snapshot = await store.snapshot(false);
-  return snapshot.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return getCachedMessages();
 }
 
 export async function getMessageById(id: string) {
-  const store = await getAppStore();
-  if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
-    const { messages } = await store.getMessagesData();
-    return messages.find((item) => item.id === id) ?? null;
-  }
-  const snapshot = await store.snapshot(false);
-  return snapshot.messages.find((item) => item.id === id) ?? null;
+  return getCachedMessageById(id);
 }
 
 export async function markMessageRead(id: string) {
@@ -67,6 +86,7 @@ export async function markMessageRead(id: string) {
   }
   const nextMessage = { ...message, read: true };
   await store.updateMessage(nextMessage);
+  revalidateMessageReadModels();
   return nextMessage;
 }
 
@@ -174,6 +194,7 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
 
   if (nextMessages.length > 0) {
     await store.addMessages(nextMessages);
+    revalidateMessageReadModels();
   }
 
   for (const asset of nextMedia) {

@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+
+import { CACHE_TAGS } from "@/lib/domain/cache-tags";
 import type { AppSnapshot, InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "@/lib/types";
 
 import { getAppSnapshot } from "@/lib/domain/store";
@@ -99,7 +102,8 @@ export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[
   return buildRankedTasks(await getAppSnapshot({ includeDevices: false }), metric);
 }
 
-export async function getAnalyticsPayload() {
+const getCachedAnalyticsPayload = unstable_cache(
+  async () => {
   const store = await getAppStore();
   if ("getAnalyticsData" in store && typeof store.getAnalyticsData === "function") {
     const minimal = await store.getAnalyticsData();
@@ -169,4 +173,11 @@ export async function getAnalyticsPayload() {
       messageCount: buildRankedTasks(snapshot, "messageCount")
     }
   };
+  },
+  ["analytics-payload"],
+  { revalidate: 5, tags: [CACHE_TAGS.analytics] }
+);
+
+export async function getAnalyticsPayload() {
+  return getCachedAnalyticsPayload();
 }

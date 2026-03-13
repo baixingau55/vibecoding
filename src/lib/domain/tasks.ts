@@ -1,4 +1,5 @@
 import env from "@/lib/env";
+import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
 import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
 import { getAppSnapshot } from "@/lib/domain/store";
@@ -11,6 +12,7 @@ import {
   startTpLinkInspectionTask
 } from "@/lib/tplink/client";
 import { slugId } from "@/lib/utils";
+import { unstable_cache } from "next/cache";
 import type {
   Algorithm,
   InspectionFailure,
@@ -266,14 +268,22 @@ function buildProfileSupportFailures(task: InspectionTask, runId: string, profil
   );
 }
 
+const getCachedTaskList = unstable_cache(
+  async () => {
+    const store = await getAppStore();
+    if ("listTasksData" in store && typeof store.listTasksData === "function") {
+      const tasks = await store.listTasksData();
+      return tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    }
+    const snapshot = await store.snapshot(false);
+    return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  },
+  ["task-list"],
+  { revalidate: 5, tags: [CACHE_TAGS.tasks] }
+);
+
 export async function listTasks() {
-  const store = await getAppStore();
-  if ("listTasksData" in store && typeof store.listTasksData === "function") {
-    const tasks = await store.listTasksData();
-    return tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-  const snapshot = await store.snapshot(false);
-  return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return getCachedTaskList();
 }
 
 export async function triggerDueTasks(now = new Date()) {
@@ -319,18 +329,26 @@ export async function triggerDueTasks(now = new Date()) {
   return summary;
 }
 
-export async function getTaskById(id: string) {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
-  const task = snapshot.tasks.find((item) => item.id === id) ?? null;
-  if (!task) return null;
+const getCachedTaskById = unstable_cache(
+  async (id: string) => {
+    const snapshot = await getAppSnapshot({ includeDevices: false });
+    const task = snapshot.tasks.find((item) => item.id === id) ?? null;
+    if (!task) return null;
 
-  return {
-    task,
-    runs: snapshot.runs.filter((item) => item.taskId === id),
-    results: snapshot.results.filter((item) => item.taskId === id),
-    failures: snapshot.failures.filter((item) => item.taskId === id),
-    messages: snapshot.messages.filter((item) => item.taskId === id)
-  };
+    return {
+      task,
+      runs: snapshot.runs.filter((item) => item.taskId === id),
+      results: snapshot.results.filter((item) => item.taskId === id),
+      failures: snapshot.failures.filter((item) => item.taskId === id),
+      messages: snapshot.messages.filter((item) => item.taskId === id)
+    };
+  },
+  ["task-detail"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
+);
+
+export async function getTaskById(id: string) {
+  return getCachedTaskById(id);
 }
 
 export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
@@ -360,6 +378,7 @@ export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
   };
 
   await store.upsertTask(task);
+  revalidateTaskReadModels();
   return task;
 }
 
@@ -375,6 +394,7 @@ export async function closeTask(id: string) {
     updatedAt: new Date().toISOString()
   };
   await store.upsertTask(task);
+  revalidateTaskReadModels();
   return task;
 }
 
@@ -386,6 +406,7 @@ export async function deleteTask(id: string) {
 
   if ("deleteTask" in store && typeof store.deleteTask === "function") {
     await store.deleteTask(id);
+    revalidateTaskReadModels();
     return task;
   }
 
@@ -493,6 +514,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
     updatedAt: new Date().toISOString(),
     nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
   });
+  revalidateTaskReadModels();
 
   if (failures.length > 0) {
     await refundUnits(task.id, failures.length);
@@ -634,6 +656,7 @@ export async function executeTask(taskId: string) {
       updatedAt: new Date().toISOString(),
       nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
     });
+    revalidateTaskReadModels();
 
     return { run: runs[0], runs, results: [], failures: unsupportedFailures, messages: [] };
   } catch (error) {
@@ -790,6 +813,7 @@ export async function handleTpLinkTaskCallback(payload: {
     updatedAt: new Date().toISOString(),
     nextRunAt: hasOtherRunningRuns ? task.nextRunAt : getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
   });
+  revalidateTaskReadModels();
 
   return { ok: true, resultCount: results.length, failureCount: failures.length, messageCount: messages.length };
 }
