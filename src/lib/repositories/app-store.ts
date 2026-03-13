@@ -499,6 +499,20 @@ export async function getAppStore() {
     },
     async listTasksData() {
       return withReadCache("tasks:list", async () => {
+        const nestedRes = await client
+          .from("inspection_tasks")
+          .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
+          .order("updated_at", { ascending: false });
+
+        if (!nestedRes.error && nestedRes.data) {
+          return composeTasks(
+            nestedRes.data,
+            nestedRes.data.flatMap((row) => row.inspection_task_devices ?? []),
+            nestedRes.data.flatMap((row) => row.inspection_task_schedules ?? []),
+            nestedRes.data.flatMap((row) => row.inspection_task_regions ?? [])
+          );
+        }
+
         const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
           client.from("inspection_tasks").select("*").order("updated_at", { ascending: false }),
           client.from("inspection_task_devices").select("*"),
@@ -512,14 +526,7 @@ export async function getAppStore() {
     },
     async getMessagesData() {
       return withReadCache("messages:list", async () => {
-        const [messageRes, mediaRes] = await Promise.all([
-          client.from("messages").select("*").order("created_at", { ascending: false }),
-          client.from("message_media").select("*")
-        ]);
-        const errors = [messageRes.error, mediaRes.error].filter(Boolean);
-        if (errors.length > 0) throw errors[0];
-        return {
-          messages: (messageRes.data ?? []).map<MessageItem>((row) => ({
+        const mapMessage = (row: Record<string, any>): MessageItem => ({
             id: row.id,
             taskId: row.task_id,
             runId: row.run_id ?? undefined,
@@ -537,20 +544,57 @@ export async function getAppStore() {
             imageId: row.image_id ?? undefined,
             videoTaskId: row.video_task_id ?? undefined,
             profileId: row.profile_id ?? undefined
-          })),
-          media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
+          });
+        const mapMedia = (row: Record<string, any>): MediaAsset => ({
             id: row.id,
             kind: row.kind,
             messageId: row.message_id ?? undefined,
             taskId: row.task_id ?? undefined,
             url: row.url,
             expiresAt: row.expires_at
-          }))
+          });
+
+        const nestedRes = await client.from("messages").select("*, message_media(*)").order("created_at", { ascending: false });
+        if (!nestedRes.error && nestedRes.data) {
+          return {
+            messages: nestedRes.data.map(mapMessage),
+            media: nestedRes.data.flatMap((row) => (row.message_media ?? []).map(mapMedia))
+          };
+        }
+
+        const [messageRes, mediaRes] = await Promise.all([
+          client.from("messages").select("*").order("created_at", { ascending: false }),
+          client.from("message_media").select("*")
+        ]);
+        const errors = [messageRes.error, mediaRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        return {
+          messages: (messageRes.data ?? []).map(mapMessage),
+          media: (mediaRes.data ?? []).map(mapMedia)
         };
       });
     },
     async getAnalyticsData() {
       return withReadCache("analytics:data", async () => {
+        const nestedRes = await client
+          .from("inspection_tasks")
+          .select("id,name,inspection_results(task_id,result,image_time),messages(task_id,created_at)");
+
+        if (!nestedRes.error && nestedRes.data) {
+          return {
+            tasks: nestedRes.data.map((row) => ({ id: row.id, name: row.name })),
+            results: nestedRes.data.flatMap((row) => row.inspection_results ?? []).map((row) => ({
+              taskId: row.task_id,
+              result: row.result,
+              imageTime: row.image_time
+            })),
+            messages: nestedRes.data.flatMap((row) => row.messages ?? []).map((row) => ({
+              taskId: row.task_id,
+              createdAt: row.created_at
+            }))
+          };
+        }
+
         const [taskRes, resultRes, messageRes] = await Promise.all([
           client.from("inspection_tasks").select("id,name"),
           client.from("inspection_results").select("task_id,result,image_time"),
