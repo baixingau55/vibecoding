@@ -9,6 +9,10 @@ import type { PurchaseRecord, ServiceBalance } from "@/lib/types";
 
 const getCachedBalance = unstable_cache(
   async () => {
+    const store = await getAppStore();
+    if ("getServiceBalanceData" in store && typeof store.getServiceBalanceData === "function") {
+      return store.getServiceBalanceData();
+    }
     const snapshot = await getAppSnapshot({ includeDevices: false });
     return snapshot.serviceBalance;
   },
@@ -18,6 +22,10 @@ const getCachedBalance = unstable_cache(
 
 const getCachedPurchaseHistory = unstable_cache(
   async () => {
+    const store = await getAppStore();
+    if ("getPurchaseHistoryData" in store && typeof store.getPurchaseHistoryData === "function") {
+      return store.getPurchaseHistoryData();
+    }
     const snapshot = await getAppSnapshot({ includeDevices: false });
     return snapshot.purchaseRecords;
   },

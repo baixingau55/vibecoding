@@ -23,6 +23,8 @@ import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 const INITIAL_BALANCE_ID = "default";
 const READ_CACHE_TTL_MS = 5_000;
+const SCHEMA_CACHE_TTL_MS = 30_000;
+const BASE_ROWS_CACHE_TTL_MS = 30_000;
 const FALLBACK_DEVICE_PREVIEW =
   "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 
@@ -34,6 +36,10 @@ type ReadCacheEntry<T> = {
 };
 
 const readCache = new Map<string, ReadCacheEntry<unknown>>();
+let schemaReadyCache: { checkedAt: number; ready: boolean } | null = null;
+let schemaReadyPromise: Promise<boolean> | null = null;
+let baseRowsEnsuredAt = 0;
+let baseRowsPromise: Promise<boolean> | null = null;
 
 function isMissingTableError(error: unknown) {
   return error instanceof PostgrestError && error.code === "PGRST205";
@@ -149,13 +155,80 @@ async function hasSupabaseSchema() {
   const client = getSupabaseAdminClient();
   if (!client) return false;
 
-  const { error } = await client.from("service_balance").select("id").limit(1);
-  return !error || !isMissingTableError(error);
+  const now = Date.now();
+  if (schemaReadyCache && now - schemaReadyCache.checkedAt < SCHEMA_CACHE_TTL_MS) {
+    return schemaReadyCache.ready;
+  }
+
+  if (schemaReadyPromise) {
+    return schemaReadyPromise;
+  }
+
+  schemaReadyPromise = (async () => {
+    const { error } = await client.from("service_balance").select("id").limit(1);
+    const ready = !error || !isMissingTableError(error);
+    schemaReadyCache = { checkedAt: Date.now(), ready };
+    return ready;
+  })()
+    .finally(() => {
+      schemaReadyPromise = null;
+    });
+
+  return schemaReadyPromise;
 }
 
 async function ensureBaseRows() {
   const client = getSupabaseAdminClient();
   if (!client) return false;
+
+  const nowTs = Date.now();
+  if (nowTs - baseRowsEnsuredAt < BASE_ROWS_CACHE_TTL_MS) {
+    return true;
+  }
+
+  if (baseRowsPromise) {
+    return baseRowsPromise;
+  }
+
+  baseRowsPromise = (async () => {
+    const { data, error } = await client.from("service_balance").select("*").eq("id", INITIAL_BALANCE_ID).maybeSingle();
+    if (error && !isMissingTableError(error)) {
+      throw error;
+    }
+
+    if (!data) {
+      const nowIso = new Date().toISOString();
+      await client.from("service_balance").upsert(
+        {
+          id: INITIAL_BALANCE_ID,
+          total: 50000,
+          remaining: 50000,
+          used: 0,
+          purchased: 0,
+          last_updated_at: nowIso
+        },
+        { onConflict: "id" }
+      );
+      await client.from("balance_ledger").upsert(
+        {
+          id: slugId("ledger"),
+          created_at: nowIso,
+          delta: 50000,
+          reason: "initial_grant",
+          note: "system-initial-grant"
+        },
+        { onConflict: "id" }
+      );
+    }
+
+    baseRowsEnsuredAt = Date.now();
+    return true;
+  })().finally(() => {
+    baseRowsPromise = null;
+  });
+
+  return baseRowsPromise;
+  /*
 
   const { data, error } = await client.from("service_balance").select("*").eq("id", INITIAL_BALANCE_ID).maybeSingle();
   if (error && !isMissingTableError(error)) {
@@ -188,6 +261,7 @@ async function ensureBaseRows() {
   }
 
   return true;
+  */
 }
 
 async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
@@ -522,6 +596,41 @@ export async function getAppStore() {
         const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
         if (errors.length > 0) throw errors[0];
         return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+      });
+    },
+    async getServiceBalanceData() {
+      return withReadCache("service-balance:data", async () => {
+        const { data, error } = await client.from("service_balance").select("*").eq("id", INITIAL_BALANCE_ID).maybeSingle();
+        if (error && !isMissingTableError(error)) throw error;
+        return data
+          ? {
+              total: data.total,
+              remaining: data.remaining,
+              used: data.used,
+              purchased: data.purchased,
+              lastUpdatedAt: data.last_updated_at
+            }
+          : {
+              total: 50000,
+              remaining: 50000,
+              used: 0,
+              purchased: 0,
+              lastUpdatedAt: new Date().toISOString()
+            };
+      });
+    },
+    async getPurchaseHistoryData() {
+      return withReadCache("purchase-history:data", async () => {
+        const { data, error } = await client.from("purchase_records").select("*").order("created_at", { ascending: false });
+        if (error && !isMissingTableError(error)) throw error;
+        return (data ?? []).map<PurchaseRecord>((row) => ({
+          id: row.id,
+          createdAt: row.created_at,
+          accountName: row.account_name,
+          amount: row.amount,
+          source: row.source,
+          note: row.note
+        }));
       });
     },
     async getMessagesData() {

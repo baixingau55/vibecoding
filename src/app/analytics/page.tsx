@@ -1,14 +1,5 @@
-import { AnalyticsDashboard } from "@/components/charts/analytics-dashboard";
-import { getAnalyticsPayload } from "@/lib/domain/analytics";
+import { AnalyticsPageClient } from "@/components/pages/analytics-page-client";
 
-export default async function AnalyticsPage() {
-  const { overview, trends, rankings } = await getAnalyticsPayload();
-
-  return (
-    <AnalyticsDashboard
-      overview={overview}
-      trends={trends}
-      rankings={rankings}
-    />
-  );
+export default function AnalyticsPage() {
+  return <AnalyticsPageClient />;
 }
