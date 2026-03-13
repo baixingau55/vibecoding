@@ -267,7 +267,12 @@ function buildProfileSupportFailures(task: InspectionTask, runId: string, profil
 }
 
 export async function listTasks() {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
+  const store = await getAppStore();
+  if ("listTasksData" in store && typeof store.listTasksData === "function") {
+    const tasks = await store.listTasksData();
+    return tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  const snapshot = await store.snapshot(false);
   return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 

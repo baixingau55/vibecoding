@@ -1,12 +1,18 @@
 import { MessageCenter } from "@/components/messages/message-center";
-import { getAppSnapshot } from "@/lib/domain/store";
+import { getAppStore } from "@/lib/repositories/app-store";
 
 export default async function MessagesPage() {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
-  const messages = [...snapshot.messages].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const store = await getAppStore();
+  const fallbackSnapshot =
+    "getMessagesData" in store && typeof store.getMessagesData === "function" ? null : await store.snapshot(false);
+  const { messages, media } =
+    "getMessagesData" in store && typeof store.getMessagesData === "function"
+      ? await store.getMessagesData()
+      : { messages: fallbackSnapshot!.messages, media: fallbackSnapshot!.media };
+  const sortedMessages = [...messages].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const mediaByMessage = Object.fromEntries(
-    messages.map((message) => [message.id, snapshot.media.filter((item) => item.messageId === message.id)])
+    sortedMessages.map((message) => [message.id, media.filter((item) => item.messageId === message.id)])
   );
 
-  return <MessageCenter initialMessages={messages} mediaByMessage={mediaByMessage} />;
+  return <MessageCenter initialMessages={sortedMessages} mediaByMessage={mediaByMessage} />;
 }

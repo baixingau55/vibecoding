@@ -1,8 +1,11 @@
-import type { InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "@/lib/types";
+import type { AppSnapshot, InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "@/lib/types";
 
 import { getAppSnapshot } from "@/lib/domain/store";
+import { getAppStore } from "@/lib/repositories/app-store";
 
-function buildInspectionOverview(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>): InspectionOverview {
+type AnalyticsSnapshot = Pick<AppSnapshot, "tasks" | "results" | "messages">;
+
+function buildInspectionOverview(snapshot: AnalyticsSnapshot): InspectionOverview {
   const successfulResults = snapshot.results.filter((item) => item.result !== "UNAVAILABLE");
   const qualifiedCount = successfulResults.filter((item) => item.result === "QUALIFIED").length;
   const unqualifiedCount = successfulResults.filter((item) => item.result === "UNQUALIFIED").length;
@@ -19,7 +22,7 @@ function buildInspectionOverview(snapshot: Awaited<ReturnType<typeof getAppSnaps
   };
 }
 
-function buildTrendPoints(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>): TrendPoint[] {
+function buildTrendPoints(snapshot: AnalyticsSnapshot): TrendPoint[] {
   const grouped = new Map<string, TrendPoint>();
 
   for (const result of snapshot.results) {
@@ -65,7 +68,7 @@ function buildTrendPoints(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>):
     });
 }
 
-function buildRankedTasks(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>, metric: RankingMetric): RankedTask[] {
+function buildRankedTasks(snapshot: AnalyticsSnapshot, metric: RankingMetric): RankedTask[] {
   const rankings = snapshot.tasks.map<RankedTask>((task) => {
     const results = snapshot.results.filter((item) => item.taskId === task.id && item.result !== "UNAVAILABLE");
     const messages = snapshot.messages.filter((item) => item.taskId === task.id);
@@ -97,6 +100,65 @@ export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[
 }
 
 export async function getAnalyticsPayload() {
+  const store = await getAppStore();
+  if ("getAnalyticsData" in store && typeof store.getAnalyticsData === "function") {
+    const minimal = await store.getAnalyticsData();
+    const snapshot = {
+      tasks: minimal.tasks.map((task) => ({
+        id: task.id,
+        name: task.name,
+        status: "enabled" as const,
+        algorithmIds: [],
+        algorithmVersions: {},
+        devices: [],
+        schedules: [],
+        inspectionRule: { resultMode: "detect_target" as const },
+        messageRule: { enabled: true, triggerMode: "every_unqualified" as const, continuousCount: 3 },
+        regionsByQrCode: {},
+        createdAt: "",
+        updatedAt: "",
+        nextRunAt: undefined,
+        closedAt: undefined,
+        configErrorReason: undefined
+      })),
+      results: minimal.results.map((result, index) => ({
+        id: `analytics-${index}`,
+        runId: "",
+        taskId: result.taskId,
+        qrCode: "",
+        channelId: 1,
+        algorithmId: "",
+        algorithmVersion: "",
+        imageUrl: "",
+        imageTime: result.imageTime,
+        result: result.result
+      })),
+      messages: minimal.messages.map((message, index) => ({
+        id: `analytics-msg-${index}`,
+        taskId: message.taskId,
+        type: "inspection_unqualified" as const,
+        read: true,
+        title: "",
+        description: "",
+        result: "UNQUALIFIED" as const,
+        qrCode: "",
+        channelId: 1,
+        algorithmId: "",
+        createdAt: message.createdAt
+      }))
+    };
+
+    return {
+      overview: buildInspectionOverview(snapshot),
+      trends: buildTrendPoints(snapshot),
+      rankings: {
+        unqualifiedRate: buildRankedTasks(snapshot, "unqualifiedRate"),
+        unqualifiedCount: buildRankedTasks(snapshot, "unqualifiedCount"),
+        messageCount: buildRankedTasks(snapshot, "messageCount")
+      }
+    };
+  }
+
   const snapshot = await getAppSnapshot({ includeDevices: false });
   return {
     overview: buildInspectionOverview(snapshot),

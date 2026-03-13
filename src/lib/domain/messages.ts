@@ -39,12 +39,22 @@ function normalizeList(payload: Record<string, unknown>) {
 }
 
 export async function getMessages() {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
+  const store = await getAppStore();
+  if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
+    const { messages } = await store.getMessagesData();
+    return messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  const snapshot = await store.snapshot(false);
   return snapshot.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getMessageById(id: string) {
-  const snapshot = await getAppSnapshot({ includeDevices: false });
+  const store = await getAppStore();
+  if ("getMessagesData" in store && typeof store.getMessagesData === "function") {
+    const { messages } = await store.getMessagesData();
+    return messages.find((item) => item.id === id) ?? null;
+  }
+  const snapshot = await store.snapshot(false);
   return snapshot.messages.find((item) => item.id === id) ?? null;
 }
 

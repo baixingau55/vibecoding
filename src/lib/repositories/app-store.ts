@@ -40,6 +40,71 @@ function toDateString(value: string | null | undefined) {
   return value ?? undefined;
 }
 
+function composeTasks(
+  taskRows: Array<Record<string, any>>,
+  taskDeviceRows: Array<Record<string, any>>,
+  taskScheduleRows: Array<Record<string, any>>,
+  taskRegionRows: Array<Record<string, any>>
+) {
+  const tasksById = new Map<string, InspectionTask>();
+
+  for (const row of taskRows) {
+    tasksById.set(row.id, {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      algorithmIds: row.algorithm_ids ?? [],
+      algorithmVersions: row.algorithm_versions ?? {},
+      devices: [],
+      schedules: [],
+      inspectionRule: row.inspection_rule ?? undefined,
+      messageRule: row.message_rule ?? { enabled: true, triggerMode: "every_unqualified", continuousCount: 3 },
+      regionsByQrCode: {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      nextRunAt: toDateString(row.next_run_at),
+      closedAt: toDateString(row.closed_at),
+      configErrorReason: row.config_error_reason ?? undefined
+    });
+  }
+
+  for (const row of taskDeviceRows) {
+    const task = tasksById.get(row.task_id);
+    if (!task) continue;
+    task.devices.push({
+      qrCode: row.qr_code,
+      mac: row.mac ?? undefined,
+      channelId: row.channel_id,
+      name: row.name,
+      status: row.status,
+      groupName: row.group_name,
+      previewImage: row.preview_image,
+      profileId: row.profile_id ?? undefined,
+      profileName: row.profile_name ?? undefined
+    });
+  }
+
+  for (const row of taskScheduleRows) {
+    const task = tasksById.get(row.task_id);
+    if (!task) continue;
+    task.schedules.push({
+      type: row.schedule_type,
+      startTime: row.start_time,
+      endTime: row.end_time ?? undefined,
+      repeatDays: row.repeat_days ?? [],
+      intervalMinutes: row.interval_minutes ?? undefined
+    } satisfies InspectionSchedule);
+  }
+
+  for (const row of taskRegionRows) {
+    const task = tasksById.get(row.task_id);
+    if (!task) continue;
+    task.regionsByQrCode[row.qr_code] = (row.regions ?? []) as RegionShape[];
+  }
+
+  return Array.from(tasksById.values());
+}
+
 async function hasSupabaseSchema() {
   const client = getSupabaseAdminClient();
   if (!client) return false;
@@ -205,62 +270,7 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
     throw errors[0];
   }
 
-  const tasksById = new Map<string, InspectionTask>();
-  for (const row of taskRes.data ?? []) {
-    tasksById.set(row.id, {
-      id: row.id,
-      name: row.name,
-      status: row.status,
-      algorithmIds: row.algorithm_ids ?? [],
-      algorithmVersions: row.algorithm_versions ?? {},
-      devices: [],
-      schedules: [],
-      inspectionRule: row.inspection_rule ?? undefined,
-      messageRule: row.message_rule ?? { enabled: true, triggerMode: "every_unqualified", continuousCount: 3 },
-      regionsByQrCode: {},
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      nextRunAt: toDateString(row.next_run_at),
-      closedAt: toDateString(row.closed_at),
-      configErrorReason: row.config_error_reason ?? undefined
-    });
-  }
-
-  for (const row of taskDeviceRes.data ?? []) {
-    const task = tasksById.get(row.task_id);
-    if (!task) continue;
-      task.devices.push({
-        qrCode: row.qr_code,
-        mac: row.mac ?? undefined,
-        channelId: row.channel_id,
-        name: row.name,
-        status: row.status,
-        groupName: row.group_name,
-        previewImage: row.preview_image,
-        profileId: row.profile_id ?? undefined,
-        profileName: row.profile_name ?? undefined
-      });
-  }
-
-  for (const row of taskScheduleRes.data ?? []) {
-    const task = tasksById.get(row.task_id);
-    if (!task) continue;
-    task.schedules.push({
-      type: row.schedule_type,
-      startTime: row.start_time,
-      endTime: row.end_time ?? undefined,
-      repeatDays: row.repeat_days ?? [],
-      intervalMinutes: row.interval_minutes ?? undefined
-    } satisfies InspectionSchedule);
-  }
-
-  for (const row of taskRegionRes.data ?? []) {
-    const task = tasksById.get(row.task_id);
-    if (!task) continue;
-    task.regionsByQrCode[row.qr_code] = (row.regions ?? []) as RegionShape[];
-  }
-
-  const tasks = Array.from(tasksById.values());
+  const tasks = composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
   const resultQrCodes = Array.from(new Set((resultRes.data ?? []).map((row) => row.qr_code).filter(Boolean)));
   const knownTaskDevices = tasks.flatMap((task) => task.devices);
   const devices = includeDevices ? await loadDevices(knownTaskDevices, resultQrCodes) : buildKnownDevices(knownTaskDevices, resultQrCodes);
@@ -444,6 +454,89 @@ export async function getAppStore() {
         return getFallbackStore().snapshot(includeDevices);
       }
       return snapshot;
+    },
+    async listTasksData() {
+      const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
+        client.from("inspection_tasks").select("*").order("updated_at", { ascending: false }),
+        client.from("inspection_task_devices").select("*"),
+        client.from("inspection_task_schedules").select("*"),
+        client.from("inspection_task_regions").select("*")
+      ]);
+      const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
+      if (errors.length > 0) throw errors[0];
+      return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+    },
+    async getMessagesData() {
+      const [messageRes, mediaRes] = await Promise.all([
+        client.from("messages").select("*").order("created_at", { ascending: false }),
+        client.from("message_media").select("*")
+      ]);
+      const errors = [messageRes.error, mediaRes.error].filter(Boolean);
+      if (errors.length > 0) throw errors[0];
+      return {
+        messages: (messageRes.data ?? []).map<MessageItem>((row) => ({
+          id: row.id,
+          taskId: row.task_id,
+          runId: row.run_id ?? undefined,
+          resultId: row.result_id ?? undefined,
+          type: row.type,
+          read: row.read,
+          title: row.title,
+          description: row.description,
+          result: row.result,
+          qrCode: row.qr_code,
+          channelId: row.channel_id,
+          algorithmId: row.algorithm_id,
+          createdAt: row.created_at,
+          imageUrl: row.image_url ?? undefined,
+          imageId: row.image_id ?? undefined,
+          videoTaskId: row.video_task_id ?? undefined,
+          profileId: row.profile_id ?? undefined
+        })),
+        media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
+          id: row.id,
+          kind: row.kind,
+          messageId: row.message_id ?? undefined,
+          taskId: row.task_id ?? undefined,
+          url: row.url,
+          expiresAt: row.expires_at
+        }))
+      };
+    },
+    async getAnalyticsData() {
+      const [taskRes, resultRes, messageRes] = await Promise.all([
+        client.from("inspection_tasks").select("id,name"),
+        client.from("inspection_results").select("task_id,result,image_time"),
+        client.from("messages").select("task_id,created_at")
+      ]);
+      const errors = [taskRes.error, resultRes.error, messageRes.error].filter(Boolean);
+      if (errors.length > 0) throw errors[0];
+      return {
+        tasks: (taskRes.data ?? []).map((row) => ({ id: row.id, name: row.name })),
+        results: (resultRes.data ?? []).map((row) => ({
+          taskId: row.task_id,
+          result: row.result,
+          imageTime: row.image_time
+        })),
+        messages: (messageRes.data ?? []).map((row) => ({
+          taskId: row.task_id,
+          createdAt: row.created_at
+        }))
+      };
+    },
+    async getTaskPreviewData() {
+      const { data, error } = await client
+        .from("inspection_results")
+        .select("task_id,qr_code,image_url,image_time")
+        .not("image_url", "is", null)
+        .order("image_time", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        taskId: row.task_id,
+        qrCode: row.qr_code,
+        imageUrl: row.image_url,
+        imageTime: row.image_time
+      }));
     },
     async replace() {
       throw new Error("Supabase replace is not supported.");
