@@ -331,6 +331,30 @@ export async function triggerDueTasks(now = new Date()) {
 
 const getCachedTaskById = unstable_cache(
   async (id: string) => {
+    const store = await getAppStore();
+
+    if ("getTaskSummaryData" in store && typeof store.getTaskSummaryData === "function") {
+      const [task, runs, results, failures, messagePayload] = await Promise.all([
+        store.getTaskSummaryData(id),
+        "getTaskRunsData" in store && typeof store.getTaskRunsData === "function" ? store.getTaskRunsData(id) : Promise.resolve([]),
+        "getTaskResultsData" in store && typeof store.getTaskResultsData === "function" ? store.getTaskResultsData(id) : Promise.resolve([]),
+        "getTaskFailuresData" in store && typeof store.getTaskFailuresData === "function" ? store.getTaskFailuresData(id) : Promise.resolve([]),
+        "getTaskMessagesData" in store && typeof store.getTaskMessagesData === "function"
+          ? store.getTaskMessagesData(id)
+          : Promise.resolve({ messages: [], media: [], mediaByMessage: {} as Record<string, MediaAsset[]> })
+      ]);
+
+      if (!task) return null;
+
+      return {
+        task,
+        runs,
+        results,
+        failures,
+        messages: messagePayload.messages
+      };
+    }
+
     const snapshot = await getAppSnapshot({ includeDevices: false });
     const task = snapshot.tasks.find((item) => item.id === id) ?? null;
     if (!task) return null;
@@ -349,6 +373,98 @@ const getCachedTaskById = unstable_cache(
 
 export async function getTaskById(id: string) {
   return getCachedTaskById(id);
+}
+
+const getCachedTaskSummary = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getTaskSummaryData" in store && typeof store.getTaskSummaryData === "function") {
+      return store.getTaskSummaryData(id);
+    }
+    const detail = await getTaskById(id);
+    return detail?.task ?? null;
+  },
+  ["task-detail-summary"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+);
+
+export async function getTaskSummary(id: string) {
+  return getCachedTaskSummary(id);
+}
+
+const getCachedTaskRuns = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getTaskRunsData" in store && typeof store.getTaskRunsData === "function") {
+      return store.getTaskRunsData(id);
+    }
+    const detail = await getTaskById(id);
+    return detail?.runs ?? [];
+  },
+  ["task-detail-runs"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+);
+
+export async function getTaskRuns(id: string) {
+  return getCachedTaskRuns(id);
+}
+
+const getCachedTaskResults = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getTaskResultsData" in store && typeof store.getTaskResultsData === "function") {
+      return store.getTaskResultsData(id);
+    }
+    const detail = await getTaskById(id);
+    return detail?.results ?? [];
+  },
+  ["task-detail-results"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
+);
+
+export async function getTaskResults(id: string) {
+  return getCachedTaskResults(id);
+}
+
+const getCachedTaskFailures = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getTaskFailuresData" in store && typeof store.getTaskFailuresData === "function") {
+      return store.getTaskFailuresData(id);
+    }
+    const detail = await getTaskById(id);
+    return detail?.failures ?? [];
+  },
+  ["task-detail-failures"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+);
+
+export async function getTaskFailures(id: string) {
+  return getCachedTaskFailures(id);
+}
+
+const getCachedTaskMessages = unstable_cache(
+  async (id: string) => {
+    const store = await getAppStore();
+    if ("getTaskMessagesData" in store && typeof store.getTaskMessagesData === "function") {
+      return store.getTaskMessagesData(id);
+    }
+    const snapshot = await getAppSnapshot({ includeDevices: false });
+    const messages = snapshot.messages.filter((item) => item.taskId === id);
+    const media = snapshot.media.filter((item) => item.taskId === id || (item.messageId && messages.some((message) => message.id === item.messageId)));
+    const mediaByMessage = media.reduce<Record<string, MediaAsset[]>>((accumulator, asset) => {
+      if (!asset.messageId) return accumulator;
+      (accumulator[asset.messageId] ??= []).push(asset);
+      return accumulator;
+    }, {});
+    return { messages, media, mediaByMessage };
+  },
+  ["task-detail-messages"],
+  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.messages, CACHE_TAGS.tasks] }
+);
+
+export async function getTaskMessages(id: string) {
+  return getCachedTaskMessages(id);
 }
 
 export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {

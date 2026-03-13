@@ -171,6 +171,93 @@ function composeTasks(
   return Array.from(tasksById.values());
 }
 
+function mapRunRow(row: Record<string, any>): InspectionRun {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    startedAt: row.started_at,
+    completedAt: toDateString(row.completed_at),
+    status: row.status,
+    totalChecks: row.total_checks,
+    successfulChecks: row.successful_checks,
+    failedChecks: row.failed_checks,
+    chargedUnits: row.charged_units,
+    refundedUnits: row.refunded_units,
+    tpLinkTaskId: row.tplink_task_id ?? undefined,
+    profileId: row.profile_id ?? undefined
+  };
+}
+
+function mapResultRow(row: Record<string, any>): InspectionResult {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    taskId: row.task_id,
+    qrCode: row.qr_code,
+    channelId: row.channel_id,
+    algorithmId: row.algorithm_id,
+    algorithmVersion: row.algorithm_version,
+    imageUrl: row.image_url,
+    imageTime: row.image_time,
+    result: row.result,
+    profileId: row.profile_id ?? undefined
+  };
+}
+
+function mapFailureRow(row: Record<string, any>): InspectionFailure {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    taskId: row.task_id,
+    qrCode: row.qr_code,
+    channelId: row.channel_id,
+    algorithmId: row.algorithm_id ?? undefined,
+    errorCode: row.error_code,
+    message: row.message
+  };
+}
+
+function mapMessageRow(row: Record<string, any>): MessageItem {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    runId: row.run_id ?? undefined,
+    resultId: row.result_id ?? undefined,
+    type: row.type,
+    read: row.read,
+    title: row.title,
+    description: row.description,
+    result: row.result,
+    qrCode: row.qr_code,
+    channelId: row.channel_id,
+    algorithmId: row.algorithm_id,
+    createdAt: row.created_at,
+    imageUrl: row.image_url ?? undefined,
+    imageId: row.image_id ?? undefined,
+    videoTaskId: row.video_task_id ?? undefined,
+    profileId: row.profile_id ?? undefined
+  };
+}
+
+function mapMediaRow(row: Record<string, any>): MediaAsset {
+  return {
+    id: row.id,
+    kind: row.kind,
+    messageId: row.message_id ?? undefined,
+    taskId: row.task_id ?? undefined,
+    url: row.url,
+    expiresAt: row.expires_at
+  };
+}
+
+function toMediaByMessage(media: MediaAsset[]) {
+  return media.reduce<Record<string, MediaAsset[]>>((accumulator, asset) => {
+    if (!asset.messageId) return accumulator;
+    (accumulator[asset.messageId] ??= []).push(asset);
+    return accumulator;
+  }, {});
+}
+
 async function hasSupabaseSchema() {
   const client = getSupabaseAdminClient();
   if (!client) return false;
@@ -618,6 +705,94 @@ export async function getAppStore() {
         return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
       });
     },
+    async getTaskSummaryData(taskId: string) {
+      return withReadCache(`task:${taskId}:summary`, async () => {
+        const nestedRes = await client
+          .from("inspection_tasks")
+          .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
+          .eq("id", taskId)
+          .maybeSingle();
+
+        if (!nestedRes.error && nestedRes.data) {
+          const tasks = composeTasks(
+            [nestedRes.data],
+            nestedRes.data.inspection_task_devices ?? [],
+            nestedRes.data.inspection_task_schedules ?? [],
+            nestedRes.data.inspection_task_regions ?? []
+          );
+          return tasks[0] ?? null;
+        }
+
+        const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
+          client.from("inspection_tasks").select("*").eq("id", taskId).maybeSingle(),
+          client.from("inspection_task_devices").select("*").eq("task_id", taskId),
+          client.from("inspection_task_schedules").select("*").eq("task_id", taskId),
+          client.from("inspection_task_regions").select("*").eq("task_id", taskId)
+        ]);
+
+        const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        if (!taskRes.data) return null;
+
+        const tasks = composeTasks([taskRes.data], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+        return tasks[0] ?? null;
+      });
+    },
+    async getTaskRunsData(taskId: string) {
+      return withReadCache(`task:${taskId}:runs`, async () => {
+        const { data, error } = await client
+          .from("inspection_runs")
+          .select("*")
+          .eq("task_id", taskId)
+          .order("started_at", { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map(mapRunRow);
+      });
+    },
+    async getTaskResultsData(taskId: string) {
+      return withReadCache(`task:${taskId}:results`, async () => {
+        const { data, error } = await client
+          .from("inspection_results")
+          .select("*")
+          .eq("task_id", taskId)
+          .order("image_time", { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map(mapResultRow);
+      });
+    },
+    async getTaskFailuresData(taskId: string) {
+      return withReadCache(`task:${taskId}:failures`, async () => {
+        const { data, error } = await client.from("inspection_failures").select("*").eq("task_id", taskId);
+        if (error) throw error;
+        return (data ?? []).map(mapFailureRow);
+      });
+    },
+    async getTaskMessagesData(taskId: string) {
+      return withReadCache(`task:${taskId}:messages`, async () => {
+        const nestedRes = await client
+          .from("messages")
+          .select("*, message_media(*)")
+          .eq("task_id", taskId)
+          .order("created_at", { ascending: false });
+
+        if (!nestedRes.error && nestedRes.data) {
+          const messages = nestedRes.data.map(mapMessageRow);
+          const media = nestedRes.data.flatMap((row) => (row.message_media ?? []).map(mapMediaRow));
+          return { messages, media, mediaByMessage: toMediaByMessage(media) };
+        }
+
+        const [messageRes, mediaRes] = await Promise.all([
+          client.from("messages").select("*").eq("task_id", taskId).order("created_at", { ascending: false }),
+          client.from("message_media").select("*").eq("task_id", taskId)
+        ]);
+
+        const errors = [messageRes.error, mediaRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        const messages = (messageRes.data ?? []).map(mapMessageRow);
+        const media = (mediaRes.data ?? []).map(mapMediaRow);
+        return { messages, media, mediaByMessage: toMediaByMessage(media) };
+      });
+    },
     async getServiceBalanceData() {
       return withReadCache("service-balance:data", async () => {
         const { data, error } = await client.from("service_balance").select("*").eq("id", INITIAL_BALANCE_ID).maybeSingle();
@@ -655,39 +830,11 @@ export async function getAppStore() {
     },
     async getMessagesData() {
       return withReadCache("messages:list", async () => {
-        const mapMessage = (row: Record<string, any>): MessageItem => ({
-            id: row.id,
-            taskId: row.task_id,
-            runId: row.run_id ?? undefined,
-            resultId: row.result_id ?? undefined,
-            type: row.type,
-            read: row.read,
-            title: row.title,
-            description: row.description,
-            result: row.result,
-            qrCode: row.qr_code,
-            channelId: row.channel_id,
-            algorithmId: row.algorithm_id,
-            createdAt: row.created_at,
-            imageUrl: row.image_url ?? undefined,
-            imageId: row.image_id ?? undefined,
-            videoTaskId: row.video_task_id ?? undefined,
-            profileId: row.profile_id ?? undefined
-          });
-        const mapMedia = (row: Record<string, any>): MediaAsset => ({
-            id: row.id,
-            kind: row.kind,
-            messageId: row.message_id ?? undefined,
-            taskId: row.task_id ?? undefined,
-            url: row.url,
-            expiresAt: row.expires_at
-          });
-
         const nestedRes = await client.from("messages").select("*, message_media(*)").order("created_at", { ascending: false });
         if (!nestedRes.error && nestedRes.data) {
           return {
-            messages: nestedRes.data.map(mapMessage),
-            media: nestedRes.data.flatMap((row) => (row.message_media ?? []).map(mapMedia))
+            messages: nestedRes.data.map(mapMessageRow),
+            media: nestedRes.data.flatMap((row) => (row.message_media ?? []).map(mapMediaRow))
           };
         }
 
@@ -698,8 +845,8 @@ export async function getAppStore() {
         const errors = [messageRes.error, mediaRes.error].filter(Boolean);
         if (errors.length > 0) throw errors[0];
         return {
-          messages: (messageRes.data ?? []).map(mapMessage),
-          media: (mediaRes.data ?? []).map(mapMedia)
+          messages: (messageRes.data ?? []).map(mapMessageRow),
+          media: (mediaRes.data ?? []).map(mapMediaRow)
         };
       });
     },

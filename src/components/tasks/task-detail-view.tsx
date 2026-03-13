@@ -8,7 +8,7 @@ import { FileText, RefreshCw, X } from "lucide-react";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { RegionGroupSelectorModal } from "@/components/shared/selection-modals";
 import { TaskBuilder } from "@/components/tasks/task-builder";
-import type { Algorithm, InspectionFailure, InspectionResult, InspectionRun, InspectionTask, MediaAsset, MessageItem } from "@/lib/types";
+import type { Algorithm, DeviceRef, InspectionFailure, InspectionResult, InspectionRun, InspectionTask, MediaAsset, MessageItem } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -46,27 +46,50 @@ function buildTrend(results: InspectionResult[], messages: MessageItem[]) {
     }));
 }
 
+type EditPayload = { algorithms: Algorithm[]; devices: DeviceRef[] };
+
 export function TaskDetailView({
   task,
-  runs,
-  results,
-  failures,
-  messages,
-  mediaByMessage,
-  algorithms,
-  devices
+  runs = [],
+  results = [],
+  failures = [],
+  messages = [],
+  mediaByMessage = {},
+  algorithms = [],
+  devices = [],
+  loadingRuns = false,
+  loadingResults = false,
+  loadingFailures = false,
+  loadingMessages = false,
+  runsError,
+  resultsError,
+  failuresError,
+  messagesError,
+  editDataLoader
 }: {
   task: InspectionTask;
-  runs: InspectionRun[];
-  results: InspectionResult[];
-  failures: InspectionFailure[];
-  messages: MessageItem[];
-  mediaByMessage: Record<string, MediaAsset[]>;
-  algorithms: Algorithm[];
-  devices: InspectionTask["devices"];
+  runs?: InspectionRun[];
+  results?: InspectionResult[];
+  failures?: InspectionFailure[];
+  messages?: MessageItem[];
+  mediaByMessage?: Record<string, MediaAsset[]>;
+  algorithms?: Algorithm[];
+  devices?: DeviceRef[];
+  loadingRuns?: boolean;
+  loadingResults?: boolean;
+  loadingFailures?: boolean;
+  loadingMessages?: boolean;
+  runsError?: string;
+  resultsError?: string;
+  failuresError?: string;
+  messagesError?: string;
+  editDataLoader?: () => Promise<EditPayload>;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editAlgorithms, setEditAlgorithms] = useState<Algorithm[]>(algorithms);
+  const [editDevices, setEditDevices] = useState<DeviceRef[]>(devices);
   const [closing, setClosing] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
@@ -81,6 +104,14 @@ export function TaskDetailView({
   const [replayUrl, setReplayUrl] = useState("");
   const [replayError, setReplayError] = useState("");
   const [replayLoading, setReplayLoading] = useState(false);
+
+  useEffect(() => {
+    if (algorithms.length > 0) setEditAlgorithms(algorithms);
+  }, [algorithms]);
+
+  useEffect(() => {
+    if (devices.length > 0) setEditDevices(devices);
+  }, [devices]);
 
   const algorithmName = algorithms.find((item) => item.id === task.algorithmIds[0])?.name ?? task.algorithmIds[0];
 
@@ -131,11 +162,35 @@ export function TaskDetailView({
     setReplayLoading(false);
   }, [selectedResultId, relatedVideoMedia?.url]);
 
+  async function beginEdit() {
+    if (editAlgorithms.length > 0 && editDevices.length > 0) {
+      setEditing(true);
+      return;
+    }
+    if (!editDataLoader) {
+      setEditing(true);
+      return;
+    }
+
+    setEditLoading(true);
+    setNotice("");
+    try {
+      const payload = await editDataLoader();
+      setEditAlgorithms(payload.algorithms);
+      setEditDevices(payload.devices);
+      setEditing(true);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "编辑任务配置加载失败");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   if (editing) {
     return (
       <TaskBuilder
-        algorithms={algorithms}
-        devices={devices}
+        algorithms={editAlgorithms}
+        devices={editDevices}
         initialTask={task}
         submitUrl={`/api/tasks/${task.id}`}
         method="PATCH"
@@ -188,14 +243,14 @@ export function TaskDetailView({
       <section className="ai-summary-strip ai-task-detail-summary">
         <div className="ai-summary-strip-header">
           <h1 className="ai-panel-title">任务信息</h1>
-          <button type="button" className="ai-text-button" onClick={() => setEditing(true)}>
-            编辑任务配置
+          <button type="button" className="ai-text-button" onClick={() => void beginEdit()} disabled={editLoading}>
+            {editLoading ? "加载编辑数据..." : "编辑任务配置"}
           </button>
         </div>
 
         <div className="ai-task-detail-strip-grid">
           <div><span>任务名称</span><strong>{task.name}</strong></div>
-          <div><span>任务启用状态</span><strong className="ai-success-text">{task.status === "disabled" ? "已关闭" : task.status === "running" ? "执行中" : "已开启"}</strong></div>
+          <div><span>任务状态</span><strong className="ai-success-text">{task.status === "disabled" ? "已关闭" : task.status === "running" ? "执行中" : "已开启"}</strong></div>
           <div><span>使用算法</span><strong>{algorithmName}</strong></div>
           <div><span>巡检设备</span><strong>{task.devices.length}台</strong></div>
           <div><span>巡检时间</span><strong>{task.schedules.map((item) => (item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime)).join("、") || "未配置"}</strong></div>
@@ -247,13 +302,14 @@ export function TaskDetailView({
           <div className="ai-detail-metrics ai-detail-metrics-plain">
             <h3>巡检数据概览</h3>
             <div className="ai-detail-metrics-cards ai-detail-metrics-cards-plain">
-              <div><span>任务执行完成次数</span><strong>{runs.filter((item) => item.status !== "running").length}</strong></div>
-              <div><span>总检测次数</span><strong>{totalChecks}</strong></div>
-              <div><span>合格次数</span><strong>{qualifiedCount}</strong></div>
-              <div><span>不合格次数</span><strong className="ai-danger-text">{unqualifiedCount}</strong></div>
-              <div><span>消息提醒次数</span><strong>{rangeFilteredMessages.length}</strong></div>
-              <div><span>不合格率</span><strong className="ai-danger-text">{totalChecks === 0 ? "0.00%" : `${((unqualifiedCount / totalChecks) * 100).toFixed(2)}%`}</strong></div>
+              <div><span>任务执行完成次数</span><strong>{loadingRuns ? "--" : runs.filter((item) => item.status !== "running").length}</strong></div>
+              <div><span>总检测次数</span><strong>{loadingResults ? "--" : totalChecks}</strong></div>
+              <div><span>合格次数</span><strong>{loadingResults ? "--" : qualifiedCount}</strong></div>
+              <div><span>不合格次数</span><strong className="ai-danger-text">{loadingResults ? "--" : unqualifiedCount}</strong></div>
+              <div><span>消息提醒次数</span><strong>{loadingMessages ? "--" : rangeFilteredMessages.length}</strong></div>
+              <div><span>不合格率</span><strong className="ai-danger-text">{loadingResults ? "--" : totalChecks === 0 ? "0.00%" : `${((unqualifiedCount / totalChecks) * 100).toFixed(2)}%`}</strong></div>
             </div>
+            {runsError ? <div className="ai-module-error">{runsError}</div> : null}
           </div>
 
           <div className="ai-detail-chart-card ai-detail-chart-card-plain">
@@ -271,7 +327,9 @@ export function TaskDetailView({
                 </button>
               </div>
             </div>
-            <TrendChart data={trendData} metric={metric} />
+            {loadingResults || loadingMessages ? <div className="ai-skeleton-chart" /> : <TrendChart data={trendData} metric={metric} />}
+            {resultsError ? <div className="ai-module-error">{resultsError}</div> : null}
+            {messagesError ? <div className="ai-module-error">{messagesError}</div> : null}
           </div>
         </div>
 
@@ -279,57 +337,84 @@ export function TaskDetailView({
           <h3>巡检抓拍记录</h3>
           <div className="ai-record-tabs">
             <button type="button" className={cn("ai-record-tab", recordTab === "all" && "ai-record-tab-active")} onClick={() => setRecordTab("all")}>
-              全部（{rangeFilteredResults.length}）
+              全部（{loadingResults ? "--" : rangeFilteredResults.length}）
             </button>
             <button type="button" className={cn("ai-record-tab", recordTab === "qualified" && "ai-record-tab-active")} onClick={() => setRecordTab("qualified")}>
-              巡检合格（{rangeFilteredResults.filter((item) => item.result === "QUALIFIED").length}）
+              巡检合格（{loadingResults ? "--" : rangeFilteredResults.filter((item) => item.result === "QUALIFIED").length}）
             </button>
             <button type="button" className={cn("ai-record-tab", recordTab === "unqualified" && "ai-record-tab-active")} onClick={() => setRecordTab("unqualified")}>
-              巡检不合格（{rangeFilteredResults.filter((item) => item.result === "UNQUALIFIED").length}）
+              巡检不合格（{loadingResults ? "--" : rangeFilteredResults.filter((item) => item.result === "UNQUALIFIED").length}）
             </button>
           </div>
 
           <div className="ai-record-grid ai-record-grid-detail">
-            {visibleResults.map((result) => (
-              <article key={result.id} className="ai-record-card ai-record-card-detail">
-                <div className="ai-record-image-wrap">
-                  {result.imageUrl ? <img src={result.imageUrl} alt={algorithmName} className="ai-record-image-native" /> : <div className="ai-record-image-placeholder" />}
-                </div>
-                <div className="ai-record-meta">
-                  <div>检测结果 <strong className={result.result === "UNQUALIFIED" ? "ai-danger-text" : "ai-success-text"}>{result.result === "UNQUALIFIED" ? "不合格" : "合格"}</strong></div>
-                  <div>{formatDateTime(result.imageTime)}</div>
-                  <button type="button" className="ai-text-button ai-detail-inline-link" onClick={() => setSelectedResultId(result.id)}>
-                    详情
-                  </button>
-                </div>
-              </article>
-            ))}
+            {loadingResults
+              ? Array.from({ length: 3 }).map((_, index) => (
+                  <article key={`result-skeleton-${index}`} className="ai-record-card ai-record-card-detail ai-skeleton-card">
+                    <div className="ai-record-image-wrap">
+                      <div className="ai-record-image-placeholder ai-record-image-placeholder-skeleton" />
+                    </div>
+                    <div className="ai-record-meta">
+                      <div className="ai-skeleton-line ai-skeleton-medium" />
+                      <div className="ai-skeleton-line ai-skeleton-short" />
+                    </div>
+                  </article>
+                ))
+              : visibleResults.map((result) => (
+                  <article key={result.id} className="ai-record-card ai-record-card-detail">
+                    <div className="ai-record-image-wrap">
+                      {result.imageUrl ? <img src={result.imageUrl} alt={algorithmName} className="ai-record-image-native" /> : <div className="ai-record-image-placeholder" />}
+                    </div>
+                    <div className="ai-record-meta">
+                      <div>检测结果 <strong className={result.result === "UNQUALIFIED" ? "ai-danger-text" : "ai-success-text"}>{result.result === "UNQUALIFIED" ? "不合格" : "合格"}</strong></div>
+                      <div>{formatDateTime(result.imageTime)}</div>
+                      <button type="button" className="ai-text-button ai-detail-inline-link" onClick={() => setSelectedResultId(result.id)}>
+                        详情
+                      </button>
+                    </div>
+                  </article>
+                ))}
           </div>
+          {resultsError ? <div className="ai-module-error">{resultsError}</div> : null}
         </div>
       </section>
 
       <section className="ai-panel ai-failure-panel">
         <h2 className="ai-panel-title">异常设备</h2>
-        <table className="ai-table">
-          <thead>
-            <tr>
-              <th>设备</th>
-              <th>算法</th>
-              <th>错误码</th>
-              <th>失败原因</th>
-            </tr>
-          </thead>
-          <tbody>
-            {failures.map((failure) => (
-              <tr key={failure.id}>
-                <td>{failure.qrCode}</td>
-                <td>{failure.algorithmId}</td>
-                <td>{failure.errorCode}</td>
-                <td>{failure.message}</td>
-              </tr>
+        {loadingFailures ? (
+          <div className="ai-skeleton-table">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={`failure-skeleton-${index}`} className="ai-skeleton-table-row">
+                <div className="ai-skeleton-cell ai-skeleton-cell-medium" />
+                <div className="ai-skeleton-cell ai-skeleton-cell-medium" />
+                <div className="ai-skeleton-cell ai-skeleton-cell-small" />
+                <div className="ai-skeleton-cell ai-skeleton-cell-wide" />
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table className="ai-table">
+            <thead>
+              <tr>
+                <th>设备</th>
+                <th>算法</th>
+                <th>错误码</th>
+                <th>失败原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failures.map((failure) => (
+                <tr key={failure.id}>
+                  <td>{failure.qrCode}</td>
+                  <td>{failure.algorithmId}</td>
+                  <td>{failure.errorCode}</td>
+                  <td>{failure.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {failuresError ? <div className="ai-module-error">{failuresError}</div> : null}
       </section>
 
       <button type="button" className="ai-detail-close-trigger" onClick={() => setClosing(true)}>
@@ -356,26 +441,40 @@ export function TaskDetailView({
               </button>
             </div>
             <div className="ai-modal-body ai-modal-stack">
-              <table className="ai-table">
-                <thead>
-                  <tr>
-                    <th>执行时间</th>
-                    <th>执行状态</th>
-                    <th>总检测次数</th>
-                    <th>失败设备数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => (
-                    <tr key={run.id}>
-                      <td>{formatDateTime(run.startedAt)}</td>
-                      <td>{run.status}</td>
-                      <td>{run.totalChecks}</td>
-                      <td>{run.failedChecks}</td>
-                    </tr>
+              {loadingRuns ? (
+                <div className="ai-skeleton-table">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={`run-skeleton-${index}`} className="ai-skeleton-table-row">
+                      <div className="ai-skeleton-cell ai-skeleton-cell-medium" />
+                      <div className="ai-skeleton-cell ai-skeleton-cell-small" />
+                      <div className="ai-skeleton-cell ai-skeleton-cell-small" />
+                      <div className="ai-skeleton-cell ai-skeleton-cell-small" />
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              ) : (
+                <table className="ai-table">
+                  <thead>
+                    <tr>
+                      <th>执行时间</th>
+                      <th>执行状态</th>
+                      <th>总检测次数</th>
+                      <th>失败设备数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runs.map((run) => (
+                      <tr key={run.id}>
+                        <td>{formatDateTime(run.startedAt)}</td>
+                        <td>{run.status}</td>
+                        <td>{run.totalChecks}</td>
+                        <td>{run.failedChecks}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {runsError ? <div className="ai-module-error">{runsError}</div> : null}
             </div>
           </div>
         </div>
@@ -410,7 +509,9 @@ export function TaskDetailView({
                   <img src={selectedResult.imageUrl} alt={selectedResult.algorithmId} className="ai-drawer-media-native" />
                 </div>
                 <div className="ai-replay-panel">
-                  {replayUrl ? (
+                  {replayLoading ? (
+                    <div className="ai-video-empty">正在拉取回放...</div>
+                  ) : replayUrl ? (
                     <video className="ai-inline-video" src={replayUrl} controls playsInline preload="metadata" />
                   ) : (
                     <div className="ai-video-empty">{replayError || "当前暂无可预览回放，点击下方按钮尝试拉取。"}</div>
@@ -440,7 +541,7 @@ export function TaskDetailView({
               </button>
             </div>
             <div className="ai-modal-body">
-              <p>确认关闭此巡检任务吗？关闭期间，任务将不再开始新的巡检。</p>
+              <p>确认关闭此巡检任务吗？关闭后将不再发起新的巡检，但历史数据仍可查看。</p>
             </div>
             <div className="ai-modal-footer">
               <button type="button" className="ai-button ai-button-light" onClick={() => setClosing(false)}>

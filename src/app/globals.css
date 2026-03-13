@@ -396,6 +396,30 @@ button {
   width: 100%;
 }
 
+.ai-module-error {
+  margin-top: 12px;
+  color: #c53a36;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.ai-module-error-card {
+  padding: 24px;
+}
+
+.ai-module-error-card p {
+  margin: 12px 0 0;
+  color: var(--text-soft);
+  line-height: 22px;
+}
+
+.ai-record-image-placeholder-skeleton {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #edf1f8 0%, #e2e8f4 45%, #edf1f8 100%);
+}
+
 .ai-skeleton-chart {
   width: 100%;
   height: 280px;

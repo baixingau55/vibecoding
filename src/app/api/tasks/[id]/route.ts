@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { deleteTask, getTaskById, upsertTask } from "@/lib/domain/tasks";
+import { deleteTask, getTaskSummary, upsertTask } from "@/lib/domain/tasks";
 import type { InspectionTask } from "@/lib/types";
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
-  const task = await getTaskById(params.id);
+  const task = await getTaskSummary(params.id);
   if (!task) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
