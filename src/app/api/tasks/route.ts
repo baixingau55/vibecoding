@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listTasks, upsertTask } from "@/lib/domain/tasks";
+import { listTasks, triggerDueTasks, upsertTask } from "@/lib/domain/tasks";
 import type { InspectionTask } from "@/lib/types";
 
 export async function GET() {
+  await triggerDueTasks();
   const tasks = await listTasks();
   return NextResponse.json({ tasks });
 }

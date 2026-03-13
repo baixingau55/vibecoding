@@ -229,7 +229,13 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
   const deviceByQrCode = new Map(devices.map((device) => [device.qrCode, device] as const));
 
   for (const task of tasks) {
-    task.devices = task.devices.map((device) => ({ ...device, ...(deviceByQrCode.get(device.qrCode) ?? {}) }));
+    task.devices = Array.from(
+      new Map(
+        task.devices
+          .map((device) => ({ ...device, ...(deviceByQrCode.get(device.qrCode) ?? {}) }))
+          .map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)
+      ).values()
+    );
 
     if (task.devices.length === 0) {
       const fallbackQrCodes = Array.from(
