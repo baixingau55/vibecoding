@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import type { MediaAsset, MessageItem } from "@/lib/types";
@@ -21,6 +20,9 @@ export function MessageCenter({
   const [filterOpen, setFilterOpen] = useState(false);
   const [confirmAllRead, setConfirmAllRead] = useState(false);
   const [filterState, setFilterState] = useState({ status: "all", day: "", hour: "", type: "all" });
+  const [replayUrl, setReplayUrl] = useState("");
+  const [replayError, setReplayError] = useState("");
+  const [replayLoading, setReplayLoading] = useState(false);
 
   const messageTypes = useMemo(() => Array.from(new Set(messages.map((item) => item.type))), [messages]);
 
@@ -44,6 +46,12 @@ export function MessageCenter({
   const imageMedia = selectedMedia.find((item) => item.kind === "image");
   const videoMedia = selectedMedia.find((item) => item.kind === "video");
 
+  useEffect(() => {
+    setReplayUrl(videoMedia?.url ?? "");
+    setReplayError("");
+    setReplayLoading(false);
+  }, [selectedId, videoMedia?.url]);
+
   async function markRead(id: string) {
     await fetch(`/api/messages/${id}/read`, { method: "POST" });
     setMessages((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
@@ -61,6 +69,24 @@ export function MessageCenter({
     setMessages((current) => current.map((item) => (ids.includes(item.id) ? { ...item, read: true } : item)));
     setCheckedIds([]);
     setConfirmAllRead(false);
+  }
+
+  async function loadReplayForMessage(id: string) {
+    setReplayLoading(true);
+    setReplayError("");
+    try {
+      const response = await fetch(`/api/messages/${id}/replay`, { cache: "no-store" });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error ?? "Replay fetch failed");
+      }
+      setReplayUrl(payload.url);
+    } catch (error) {
+      setReplayError(error instanceof Error ? error.message : "Replay fetch failed");
+      setReplayUrl("");
+    } finally {
+      setReplayLoading(false);
+    }
   }
 
   return (
@@ -278,15 +304,21 @@ export function MessageCenter({
                 </div>
               ) : null}
 
-              {videoMedia ? (
-                <Link href={`/api/media/${videoMedia.id}`} className="ai-button ai-button-light" target="_blank">
-                  ????
-                </Link>
-              ) : (
-                <Link href={`/api/messages/${selectedMessage.id}/replay`} className="ai-button ai-button-light" target="_blank">
-                  ????
-                </Link>
-              )}
+              <div className="ai-replay-panel">
+                {replayUrl ? (
+                  <video className="ai-inline-video" src={replayUrl} controls playsInline preload="metadata" />
+                ) : (
+                  <div className="ai-video-empty">{replayError || "当前暂无可预览回放，点击下方按钮尝试拉取。"}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="ai-button ai-button-light"
+                disabled={replayLoading}
+                onClick={() => void loadReplayForMessage(selectedMessage.id)}
+              >
+                {replayLoading ? "正在拉取回放..." : "查看回放"}
+              </button>
 
             </div>
             <div className="ai-drawer-nav">

@@ -4,22 +4,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DeviceRef, RegionPoint, RegionShape } from "@/lib/types";
 
-const CANVAS_WIDTH = 560;
-const CANVAS_HEIGHT = 330;
+const DEFAULT_STAGE_WIDTH = 560;
+const DEFAULT_STAGE_HEIGHT = 330;
 const MAX_REGIONS = 4;
 const MAX_POINTS = 8;
 
-function toCanvasPoint(point: RegionPoint) {
+type MediaRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+type PreviewState =
+  | { url: string; source: "latest-result" | "fallback-device"; imageTime?: string }
+  | { url: string; source: "local-fallback"; imageTime?: string };
+
+function toCanvasPoint(point: RegionPoint, rect: MediaRect) {
   return {
-    x: (point.x / 10000) * CANVAS_WIDTH,
-    y: (point.y / 10000) * CANVAS_HEIGHT
+    x: (point.x / 10000) * rect.width,
+    y: (point.y / 10000) * rect.height
   };
 }
 
-function toNormalizedPoint(x: number, y: number): RegionPoint {
+function toNormalizedPoint(x: number, y: number, rect: MediaRect): RegionPoint {
   return {
-    x: Math.round((x / CANVAS_WIDTH) * 10000),
-    y: Math.round((y / CANVAS_HEIGHT) * 10000)
+    x: Math.round((x / rect.width) * 10000),
+    y: Math.round((y / rect.height) * 10000)
   };
 }
 
@@ -29,6 +40,31 @@ const demoRegion: RegionPoint[] = [
   { x: 7100, y: 7400 },
   { x: 2800, y: 7200 }
 ];
+
+function getContainedRect(containerWidth: number, containerHeight: number, mediaWidth: number, mediaHeight: number): MediaRect {
+  const mediaRatio = mediaWidth / mediaHeight;
+  const containerRatio = containerWidth / containerHeight;
+
+  if (mediaRatio > containerRatio) {
+    const width = containerWidth;
+    const height = width / mediaRatio;
+    return {
+      left: 0,
+      top: (containerHeight - height) / 2,
+      width,
+      height
+    };
+  }
+
+  const height = containerHeight;
+  const width = height * mediaRatio;
+  return {
+    left: (containerWidth - width) / 2,
+    top: 0,
+    width,
+    height
+  };
+}
 
 export function RegionEditor({
   device,
@@ -44,6 +80,11 @@ export function RegionEditor({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [notice, setNotice] = useState("左键单击开始绘制，双击或右键结束绘制。");
+  const [stageSize, setStageSize] = useState({ width: DEFAULT_STAGE_WIDTH, height: DEFAULT_STAGE_HEIGHT });
+  const [imageSize, setImageSize] = useState({ width: DEFAULT_STAGE_WIDTH, height: DEFAULT_STAGE_HEIGHT });
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
 
   useEffect(() => {
     setDraft([]);
@@ -59,8 +100,65 @@ export function RegionEditor({
     return () => window.removeEventListener("pointerup", stopDrag);
   }, []);
 
-  const polygons = useMemo(() => regions.map((region) => region.points.map(toCanvasPoint)), [regions]);
-  const draftPolygon = draft.map(toCanvasPoint);
+  useEffect(() => {
+    if (!stageRef.current) return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      setStageSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height
+      });
+    });
+    observer.observe(stageRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!device) {
+      setPreview(null);
+      setPreviewError("");
+      return undefined;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError("");
+    void fetch(`/api/devices/${device.qrCode}/preview?profileId=${device.profileId ?? ""}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load device preview.");
+        }
+        return response.json() as Promise<PreviewState>;
+      })
+      .then((payload) => {
+        if (!active) return;
+        setPreview(payload);
+      })
+      .catch(() => {
+        if (!active) return;
+        setPreview({
+          url: device.previewImage,
+          source: "local-fallback"
+        });
+        setPreviewError("未获取到实时预览，当前使用最近抓拍或默认底图。");
+      })
+      .finally(() => {
+        if (active) {
+          setPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [device]);
+
+  const mediaRect = useMemo(
+    () => getContainedRect(stageSize.width, stageSize.height, imageSize.width, imageSize.height),
+    [imageSize.height, imageSize.width, stageSize.height, stageSize.width]
+  );
+
+  const polygons = useMemo(() => regions.map((region) => region.points.map((point) => toCanvasPoint(point, mediaRect))), [mediaRect, regions]);
+  const draftPolygon = useMemo(() => draft.map((point) => toCanvasPoint(point, mediaRect)), [draft, mediaRect]);
 
   if (!device) {
     return (
@@ -73,10 +171,16 @@ export function RegionEditor({
   function relativePosition(clientX: number, clientY: number) {
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return null;
-    return {
-      x: Math.max(0, Math.min(CANVAS_WIDTH, clientX - rect.left)),
-      y: Math.max(0, Math.min(CANVAS_HEIGHT, clientY - rect.top))
-    };
+    const rawX = clientX - rect.left;
+    const rawY = clientY - rect.top;
+    const boundedX = rawX - mediaRect.left;
+    const boundedY = rawY - mediaRect.top;
+
+    if (boundedX < 0 || boundedY < 0 || boundedX > mediaRect.width || boundedY > mediaRect.height) {
+      return null;
+    }
+
+    return { x: boundedX, y: boundedY };
   }
 
   function saveRegion(points = draft) {
@@ -118,12 +222,12 @@ export function RegionEditor({
     if (!point) return;
 
     setDraft((current) => {
-      const next = [...current, toNormalizedPoint(point.x, point.y)];
+      const next = [...current, toNormalizedPoint(point.x, point.y, mediaRect)];
       if (next.length >= 3) {
         setNotice("已满足成面条件，双击或右键即可结束绘制。");
       }
       if (next.length === MAX_POINTS) {
-        saveRegion(next);
+        queueMicrotask(() => saveRegion(next));
         return [];
       }
       return next;
@@ -134,7 +238,7 @@ export function RegionEditor({
     if (dragIndex === null) return;
     const point = relativePosition(event.clientX, event.clientY);
     if (!point) return;
-    setDraft((current) => current.map((item, index) => (index === dragIndex ? toNormalizedPoint(point.x, point.y) : item)));
+    setDraft((current) => current.map((item, index) => (index === dragIndex ? toNormalizedPoint(point.x, point.y, mediaRect) : item)));
   }
 
   return (
@@ -145,18 +249,26 @@ export function RegionEditor({
           <p>{device.groupName}</p>
         </div>
         <div className="tplink-message-actions">
-          <button type="button" className="tplink-chip" onClick={() => {
-            setDraft([]);
-            setEditingId(null);
-            setNotice("已清空当前草稿。");
-          }}>
+          <button
+            type="button"
+            className="tplink-chip"
+            onClick={() => {
+              setDraft([]);
+              setEditingId(null);
+              setNotice("已清空当前草稿。");
+            }}
+          >
             清空草稿
           </button>
-          <button type="button" className="tplink-chip" onClick={() => {
-            setDraft(demoRegion);
-            setEditingId(null);
-            setNotice("已恢复示例区域，可继续调整。");
-          }}>
+          <button
+            type="button"
+            className="tplink-chip"
+            onClick={() => {
+              setDraft(demoRegion);
+              setEditingId(null);
+              setNotice("已恢复示例区域，可继续调整。");
+            }}
+          >
             恢复示例
           </button>
           <button
@@ -181,48 +293,80 @@ export function RegionEditor({
           saveRegion();
         }}
         onPointerMove={handlePointerMove}
-        style={{
-          backgroundImage: `linear-gradient(180deg, rgba(20, 35, 67, 0.18), rgba(20, 35, 67, 0.4)), url(${device.previewImage})`
-        }}
       >
-        <svg viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`} aria-label="检测区域编辑器">
-          {polygons.map((polygon, index) => (
-            <polygon
-              key={`${regions[index]?.id ?? index}`}
-              points={polygon.map((point) => `${point.x},${point.y}`).join(" ")}
-              className="saved-polygon"
-              onClick={(event) => {
-                event.stopPropagation();
-                setDraft(regions[index]?.points ?? []);
-                setEditingId(regions[index]?.id ?? null);
-                setNotice(`正在编辑区域 ${regions[index]?.id ?? index + 1}。`);
-              }}
-            />
-          ))}
+        {preview?.url ? (
+          <img
+            src={preview.url}
+            alt={device.name}
+            className="region-stage-image"
+            onLoad={(event) => {
+              const target = event.currentTarget;
+              setImageSize({
+                width: target.naturalWidth || DEFAULT_STAGE_WIDTH,
+                height: target.naturalHeight || DEFAULT_STAGE_HEIGHT
+              });
+            }}
+          />
+        ) : null}
 
-          {draftPolygon.length >= 2 ? (
-            <polyline points={draftPolygon.map((point) => `${point.x},${point.y}`).join(" ")} className="draft-polyline" />
-          ) : null}
+        <div
+          className="region-stage-overlay"
+          style={{
+            left: mediaRect.left,
+            top: mediaRect.top,
+            width: mediaRect.width,
+            height: mediaRect.height
+          }}
+        >
+          <svg viewBox={`0 0 ${mediaRect.width} ${mediaRect.height}`} aria-label="检测区域编辑器">
+            {polygons.map((polygon, index) => (
+              <polygon
+                key={`${regions[index]?.id ?? index}`}
+                points={polygon.map((point) => `${point.x},${point.y}`).join(" ")}
+                className="saved-polygon"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDraft(regions[index]?.points ?? []);
+                  setEditingId(regions[index]?.id ?? null);
+                  setNotice(`正在编辑区域 ${regions[index]?.id ?? index + 1}。`);
+                }}
+              />
+            ))}
 
-          {draftPolygon.map((point, index) => (
-            <circle
-              key={`point-${index}`}
-              cx={point.x}
-              cy={point.y}
-              r={6}
-              className="draft-point"
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                setDragIndex(index);
-              }}
-            />
-          ))}
-        </svg>
+            {draftPolygon.length >= 2 ? (
+              <polyline points={draftPolygon.map((point) => `${point.x},${point.y}`).join(" ")} className="draft-polyline" />
+            ) : null}
+
+            {draftPolygon.map((point, index) => (
+              <circle
+                key={`point-${index}`}
+                cx={point.x}
+                cy={point.y}
+                r={6}
+                className="draft-point"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  setDragIndex(index);
+                }}
+              />
+            ))}
+          </svg>
+        </div>
+
+        {previewLoading ? <div className="region-stage-badge">正在加载预览底图...</div> : null}
+        {!previewLoading && preview ? (
+          <div className="region-stage-badge">
+            {preview.source === "latest-result" ? "当前使用最近抓拍底图" : "当前使用默认底图"}
+          </div>
+        ) : null}
       </div>
 
       <div className="region-help">
         <p>{notice}</p>
-        <p>当前支持最多 {MAX_REGIONS} 个区域、每个区域最多 {MAX_POINTS} 个顶点。部署前为本地预览编辑器，部署后替换为真实抓拍底图与持久化配置。</p>
+        <p>
+          当前支持最多 {MAX_REGIONS} 个区域、每个区域最多 {MAX_POINTS} 个顶点。坐标保存为归一化点位，回显时按真实底图显示区域做换算。
+        </p>
+        {previewError ? <p>{previewError}</p> : null}
       </div>
 
       <div className="region-list">

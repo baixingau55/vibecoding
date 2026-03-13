@@ -1,8 +1,7 @@
 import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
 import { getTpLinkVideoTaskFilePage, getTpLinkVideoTaskInfo, submitTpLinkCaptureVideoTask } from "@/lib/tplink/client";
-import { slugId } from "@/lib/utils";
-import type { MediaAsset } from "@/lib/types";
+import type { DeviceRef, MediaAsset } from "@/lib/types";
 
 export async function getMediaAsset(id: string) {
   const snapshot = await getAppSnapshot();
@@ -12,6 +11,35 @@ export async function getMediaAsset(id: string) {
 export async function getMediaForMessage(messageId: string) {
   const snapshot = await getAppSnapshot();
   return snapshot.media.filter((item) => item.messageId === messageId);
+}
+
+export async function getLatestPreviewForDevice(qrCode: string, profileId?: string) {
+  const snapshot = await getAppSnapshot();
+  const latestResult = snapshot.results
+    .filter((item) => item.qrCode === qrCode && (!profileId || item.profileId === profileId) && item.imageUrl)
+    .sort((a, b) => b.imageTime.localeCompare(a.imageTime))[0];
+
+  if (latestResult?.imageUrl) {
+    return {
+      url: latestResult.imageUrl,
+      source: "latest-result" as const,
+      imageTime: latestResult.imageTime
+    };
+  }
+
+  const device = snapshot.devices.find(
+    (item: DeviceRef) => item.qrCode === qrCode && (!profileId || item.profileId === profileId)
+  );
+
+  if (device?.previewImage) {
+    return {
+      url: device.previewImage,
+      source: "fallback-device" as const,
+      imageTime: undefined
+    };
+  }
+
+  return null;
 }
 
 function formatTpLinkDateTime(value: Date) {
@@ -45,35 +73,38 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
   const start = new Date(center.getTime() - 30 * 1000);
   const end = new Date(center.getTime() + 30 * 1000);
 
-  const submitResponse = await submitTpLinkCaptureVideoTask({
-    qrCode: result.qrCode,
-    channelId: result.channelId,
-    playbackStartTime: formatTpLinkDateTime(start),
-    playbackEndTime: formatTpLinkDateTime(end),
-    expireDays: 1
-  }, result.profileId);
+  const submitResponse = await submitTpLinkCaptureVideoTask(
+    {
+      qrCode: result.qrCode,
+      channelId: result.channelId,
+      playbackStartTime: formatTpLinkDateTime(start),
+      playbackEndTime: formatTpLinkDateTime(end),
+      expireDays: 1
+    },
+    result.profileId
+  );
 
   if (submitResponse.error_code !== 0 || !submitResponse.result?.taskId) {
-    throw new Error(`TP-LINK 回放任务提交失败，响应=${JSON.stringify(submitResponse)}`);
+    throw new Error(`TP-LINK replay task submit failed: ${JSON.stringify(submitResponse)}`);
   }
 
   const taskId = submitResponse.result.taskId;
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const info = await getTpLinkVideoTaskInfo(taskId, result.profileId);
     if (info.error_code !== 0) {
-      throw new Error(`TP-LINK 回放任务查询失败，error_code=${info.error_code}`);
+      throw new Error(`TP-LINK replay task info failed: error_code=${info.error_code}`);
     }
 
     const state = info.result?.state;
     if (state === 10) {
       const files = await getTpLinkVideoTaskFilePage(taskId, result.profileId);
       if (files.error_code !== 0) {
-        throw new Error(`TP-LINK 回放文件查询失败，error_code=${files.error_code}`);
+        throw new Error(`TP-LINK replay file query failed: error_code=${files.error_code}`);
       }
 
       const url = files.result?.list?.[0]?.urls?.[0];
       if (!url) {
-        throw new Error("TP-LINK 未返回回放文件地址。");
+        throw new Error("TP-LINK did not return a replay file URL.");
       }
 
       const asset: MediaAsset = {
@@ -90,13 +121,13 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
     }
 
     if (state === 11) {
-      throw new Error(info.result?.errorMsg || `TP-LINK 回放任务失败，error_code=${info.result?.error_code ?? "unknown"}`);
+      throw new Error(info.result?.errorMsg || `TP-LINK replay task failed: error_code=${info.result?.error_code ?? "unknown"}`);
     }
 
     await sleep(1500);
   }
 
-  throw new Error("TP-LINK 回放任务处理超时，请稍后重试。");
+  throw new Error("TP-LINK replay task timed out. Please try again later.");
 }
 
 export async function ensureReplayMediaForMessage(messageId: string): Promise<MediaAsset> {

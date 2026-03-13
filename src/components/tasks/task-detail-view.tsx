@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, RefreshCw, X } from "lucide-react";
 
@@ -77,6 +77,9 @@ export function TaskDetailView({
   const [endDate, setEndDate] = useState("");
   const [appliedRange, setAppliedRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [selectedResultId, setSelectedResultId] = useState("");
+  const [replayUrl, setReplayUrl] = useState("");
+  const [replayError, setReplayError] = useState("");
+  const [replayLoading, setReplayLoading] = useState(false);
 
   const algorithmName = algorithms.find((item) => item.id === task.algorithmIds[0])?.name ?? task.algorithmIds[0];
 
@@ -121,6 +124,12 @@ export function TaskDetailView({
   const relatedMedia = relatedMessage ? mediaByMessage[relatedMessage.id] ?? [] : [];
   const relatedVideoMedia = relatedMedia.find((item) => item.kind === "video");
 
+  useEffect(() => {
+    setReplayUrl(relatedVideoMedia?.url ?? "");
+    setReplayError("");
+    setReplayLoading(false);
+  }, [selectedResultId, relatedVideoMedia?.url]);
+
   if (editing) {
     return (
       <TaskBuilder
@@ -147,6 +156,24 @@ export function TaskDetailView({
     setClosing(false);
     setNotice(response.ok ? "任务已关闭，历史数据与消息仍可查看。" : payload.error ?? "关闭失败");
     router.refresh();
+  }
+
+  async function loadReplayForResult(id: string) {
+    setReplayLoading(true);
+    setReplayError("");
+    try {
+      const response = await fetch(`/api/results/${id}/replay`, { cache: "no-store" });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error ?? "Replay fetch failed");
+      }
+      setReplayUrl(payload.url);
+    } catch (error) {
+      setReplayError(error instanceof Error ? error.message : "Replay fetch failed");
+      setReplayUrl("");
+    } finally {
+      setReplayLoading(false);
+    }
   }
 
   return (
@@ -381,15 +408,21 @@ export function TaskDetailView({
                 <div className="ai-drawer-media">
                   <img src={selectedResult.imageUrl} alt={selectedResult.algorithmId} className="ai-drawer-media-native" />
                 </div>
-                {relatedVideoMedia ? (
-                  <Link href={`/api/media/${relatedVideoMedia.id}`} className="ai-button ai-button-light" target="_blank">
-                    ????
-                  </Link>
-                ) : (
-                  <Link href={`/api/results/${selectedResult.id}/replay`} className="ai-button ai-button-light" target="_blank">
-                    ????
-                  </Link>
-                )}
+                <div className="ai-replay-panel">
+                  {replayUrl ? (
+                    <video className="ai-inline-video" src={replayUrl} controls playsInline preload="metadata" />
+                  ) : (
+                    <div className="ai-video-empty">{replayError || "当前暂无可预览回放，点击下方按钮尝试拉取。"}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="ai-button ai-button-light"
+                  disabled={replayLoading}
+                  onClick={() => void loadReplayForResult(selectedResult.id)}
+                >
+                  {replayLoading ? "正在拉取回放..." : "查看回放"}
+                </button>
               </div>
             ) : null}
           </aside>
