@@ -8,6 +8,10 @@ import { PencilLine, Plus, Trash2, X } from "lucide-react";
 import { RegionEditor } from "@/components/tasks/region-editor";
 import type { Algorithm, DeviceRef, InspectionSchedule, InspectionTask, MessageRule, RegionShape } from "@/lib/types";
 
+function deviceKey(device: Pick<DeviceRef, "qrCode" | "channelId" | "profileId">) {
+  return `${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`;
+}
+
 const repeatOptions = [
   { label: "每天", days: [0, 1, 2, 3, 4, 5, 6] },
   { label: "工作日", days: [1, 2, 3, 4, 5] },
@@ -103,9 +107,13 @@ export function TaskBuilder({
 
   const [algorithmId] = useState(initialTask?.algorithmIds[0] ?? selectedAlgorithm?.id ?? "");
   const [version] = useState(initialTask?.algorithmVersions[algorithmId] ?? selectedAlgorithm?.latestVersion ?? "1.0.0");
-  const [selectedDevices, setSelectedDevices] = useState<DeviceRef[]>(initialTask?.devices ?? []);
-  const [pendingDeviceCodes, setPendingDeviceCodes] = useState<string[]>((initialTask?.devices ?? []).map((item) => item.qrCode));
-  const [activeDeviceCode, setActiveDeviceCode] = useState(initialTask?.devices[0]?.qrCode ?? "");
+  const [selectedDevices, setSelectedDevices] = useState<DeviceRef[]>(() =>
+    Array.from(new Map((initialTask?.devices ?? []).map((item) => [deviceKey(item), item] as const)).values())
+  );
+  const [pendingDeviceCodes, setPendingDeviceCodes] = useState<string[]>(() =>
+    Array.from(new Set((initialTask?.devices ?? []).map((item) => deviceKey(item))))
+  );
+  const [activeDeviceCode, setActiveDeviceCode] = useState(initialTask?.devices[0] ? deviceKey(initialTask.devices[0]) : "");
   const [regionsByQrCode, setRegionsByQrCode] = useState<Record<string, RegionShape[]>>(initialTask?.regionsByQrCode ?? {});
 
   const [schedules, setSchedules] = useState<InspectionSchedule[]>(
@@ -134,7 +142,7 @@ export function TaskBuilder({
   const [selectedGroupName, setSelectedGroupName] = useState("全部分组");
 
   const activeDevice = useMemo(
-    () => selectedDevices.find((item) => item.qrCode === activeDeviceCode) ?? null,
+    () => selectedDevices.find((item) => deviceKey(item) === activeDeviceCode) ?? null,
     [activeDeviceCode, selectedDevices]
   );
 
@@ -220,18 +228,24 @@ export function TaskBuilder({
   }
 
   function applyDevices() {
-    const nextDevices = devices.filter((item) => pendingDeviceCodes.includes(item.qrCode));
+    const nextDevices = Array.from(
+      new Map(
+        devices
+          .filter((item) => pendingDeviceCodes.includes(deviceKey(item)))
+          .map((item) => [deviceKey(item), item] as const)
+      ).values()
+    );
     setSelectedDevices(nextDevices);
-    setActiveDeviceCode(nextDevices[0]?.qrCode ?? "");
+    setActiveDeviceCode(nextDevices[0] ? deviceKey(nextDevices[0]) : "");
     setDeviceModalOpen(false);
   }
 
-  function removeDevice(qrCode: string) {
-    const next = selectedDevices.filter((item) => item.qrCode !== qrCode);
+  function removeDevice(targetKey: string) {
+    const next = selectedDevices.filter((item) => deviceKey(item) !== targetKey);
     setSelectedDevices(next);
-    setPendingDeviceCodes(next.map((item) => item.qrCode));
-    if (activeDeviceCode === qrCode) {
-      setActiveDeviceCode(next[0]?.qrCode ?? "");
+    setPendingDeviceCodes(next.map((item) => deviceKey(item)));
+    if (activeDeviceCode === targetKey) {
+      setActiveDeviceCode(next[0] ? deviceKey(next[0]) : "");
     }
   }
 
@@ -271,7 +285,7 @@ export function TaskBuilder({
       body: JSON.stringify(payload)
     });
 
-    const body = (await response.json()) as { error?: string };
+    const body = (await response.json()) as { error?: string; task?: { id: string } };
     setSaving(false);
 
     if (!response.ok) {
@@ -280,8 +294,14 @@ export function TaskBuilder({
     }
 
     if (shouldExit) {
-      router.push(method === "PATCH" && initialTask ? `/tasks/${initialTask.id}` : redirectTo);
+      const target = method === "PATCH" && initialTask ? `/tasks/${initialTask.id}` : redirectTo;
+      router.replace(target);
       router.refresh();
+      window.setTimeout(() => {
+        if (window.location.pathname !== target) {
+          window.location.assign(target);
+        }
+      }, 150);
     }
 
     return true;
@@ -495,10 +515,10 @@ export function TaskBuilder({
                 <div className="ai-device-tabs">
                   {selectedDevices.map((device) => (
                     <button
-                      key={device.qrCode}
+                      key={deviceKey(device)}
                       type="button"
-                      className={activeDeviceCode === device.qrCode ? "ai-device-tab ai-device-tab-active" : "ai-device-tab"}
-                      onClick={() => setActiveDeviceCode(device.qrCode)}
+                      className={activeDeviceCode === deviceKey(device) ? "ai-device-tab ai-device-tab-active" : "ai-device-tab"}
+                      onClick={() => setActiveDeviceCode(deviceKey(device))}
                     >
                       {device.name}
                     </button>
@@ -512,7 +532,7 @@ export function TaskBuilder({
                       <button type="button" className="ai-text-button" onClick={() => setRegionModalOpen(true)}>
                         设置检测区域
                       </button>
-                      <button type="button" className="ai-text-button" onClick={() => removeDevice(activeDevice.qrCode)}>
+                      <button type="button" className="ai-text-button" onClick={() => removeDevice(deviceKey(activeDevice))}>
                         删除当前设备
                       </button>
                     </div>
@@ -697,15 +717,16 @@ export function TaskBuilder({
                   </div>
                   <div className="ai-device-select-list">
                     {availableDevices.map((device) => {
-                      const checked = pendingDeviceCodes.includes(device.qrCode);
+                      const identity = deviceKey(device);
+                      const checked = pendingDeviceCodes.includes(identity);
                       return (
-                        <label key={device.qrCode} className="ai-device-select-item">
+                        <label key={identity} className="ai-device-select-item">
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={(event) =>
                               setPendingDeviceCodes((current) =>
-                                event.target.checked ? [...new Set([...current, device.qrCode])] : current.filter((item) => item !== device.qrCode)
+                                event.target.checked ? [...new Set([...current, identity])] : current.filter((item) => item !== identity)
                               )
                             }
                           />

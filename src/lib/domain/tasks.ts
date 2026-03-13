@@ -183,6 +183,12 @@ function mergeTaskInput(previous: InspectionTask | null, input: Partial<TaskInpu
   };
 }
 
+function dedupeDevices(devices: InspectionTask["devices"]) {
+  return Array.from(
+    new Map(devices.map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)).values()
+  );
+}
+
 async function resolveTaskDevicesForExecution(task: InspectionTask) {
   return Promise.all(
     task.devices.map(async (device) => {
@@ -304,7 +310,7 @@ export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
     name: merged.name,
     algorithmIds: merged.algorithmIds,
     algorithmVersions: merged.algorithmVersions,
-    devices: merged.devices,
+    devices: dedupeDevices(merged.devices),
     schedules: merged.schedules,
     inspectionRule: merged.inspectionRule,
     messageRule: merged.messageRule,
