@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { deleteTask, getTaskById, triggerDueTasks, upsertTask } from "@/lib/domain/tasks";
+import { deleteTask, getTaskById, upsertTask } from "@/lib/domain/tasks";
 import type { InspectionTask } from "@/lib/types";
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  await triggerDueTasks();
   const params = await context.params;
   const task = await getTaskById(params.id);
   if (!task) {

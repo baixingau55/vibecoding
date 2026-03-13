@@ -65,7 +65,9 @@ create table if not exists inspection_task_devices (
   name text not null,
   status text not null,
   group_name text not null,
-  preview_image text not null
+  preview_image text not null,
+  profile_id text,
+  profile_name text
 );
 
 create table if not exists inspection_task_schedules (
@@ -96,7 +98,8 @@ create table if not exists inspection_runs (
   failed_checks integer not null,
   charged_units integer not null,
   refunded_units integer not null,
-  tplink_task_id text
+  tplink_task_id text,
+  profile_id text
 );
 
 create table if not exists inspection_results (
@@ -109,7 +112,8 @@ create table if not exists inspection_results (
   algorithm_version text not null,
   image_url text not null,
   image_time timestamptz not null,
-  result text not null
+  result text not null,
+  profile_id text
 );
 
 create table if not exists inspection_failures (
@@ -127,6 +131,7 @@ create table if not exists messages (
   id text primary key,
   task_id text not null references inspection_tasks(id) on delete cascade,
   run_id text references inspection_runs(id) on delete set null,
+  result_id text references inspection_results(id) on delete set null,
   type text not null,
   read boolean not null default false,
   title text not null,
@@ -138,6 +143,7 @@ create table if not exists messages (
   image_url text,
   image_id text,
   video_task_id text,
+  profile_id text,
   created_at timestamptz not null default now()
 );
 
@@ -155,4 +161,13 @@ create table if not exists subscription_config (
   callback_url text not null,
   sign_secret text not null,
   initialized_at timestamptz not null default now()
+);
+
+create table if not exists scheduler_scans (
+  id text primary key,
+  scanned_at timestamptz not null default now(),
+  due_count integer not null,
+  completed_count integer not null,
+  failed_count integer not null,
+  error_summary text
 );

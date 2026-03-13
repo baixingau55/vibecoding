@@ -4,11 +4,10 @@ import { TaskDetailView } from "@/components/tasks/task-detail-view";
 import { getAlgorithms } from "@/lib/domain/algorithms";
 import { getMediaForMessage } from "@/lib/domain/media";
 import { getAppSnapshot } from "@/lib/domain/store";
-import { getTaskById, triggerDueTasks } from "@/lib/domain/tasks";
+import { getTaskById } from "@/lib/domain/tasks";
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await triggerDueTasks();
   const [detail, algorithms, snapshot] = await Promise.all([getTaskById(id), getAlgorithms(), getAppSnapshot()]);
 
   if (!detail) {

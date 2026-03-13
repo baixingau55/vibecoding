@@ -86,6 +86,19 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
       snapshot.tasks.find((task) => task.devices.some((device) => device.qrCode === qrCode) && task.algorithmIds.includes(algorithmId))?.id;
 
     if (!taskId) continue;
+    const matchedTask = snapshot.tasks.find((task) => task.id === taskId);
+    const matchedResult =
+      snapshot.results.find(
+        (result) =>
+          result.taskId === taskId &&
+          result.qrCode === qrCode &&
+          result.algorithmId === algorithmId &&
+          result.channelId === (typeof item.channelId === "number" ? item.channelId : 1)
+      ) ?? null;
+    const profileId =
+      matchedResult?.profileId ??
+      matchedTask?.devices.find((device) => device.qrCode === qrCode && device.channelId === (typeof item.channelId === "number" ? item.channelId : 1))
+        ?.profileId;
 
     const imageUrl =
       (typeof item.imageUrl === "string" && item.imageUrl) ||
@@ -107,6 +120,7 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
       id: messageId,
       taskId,
       runId: typeof item.runId === "string" ? item.runId : undefined,
+      resultId: matchedResult?.id,
       type: normalizeType(item.msgType ?? item.type),
       read: false,
       title: typeof item.title === "string" && item.title ? item.title : "任务巡检不合格消息",
@@ -121,7 +135,8 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
       createdAt: normalizeTime(item.createdAt ?? item.msgTime ?? item.timestamp),
       imageUrl,
       imageId,
-      videoTaskId: videoId
+      videoTaskId: videoId,
+      profileId
     });
 
     if (imageUrl && imageId) {

@@ -138,6 +138,7 @@ export interface InspectionResult {
   imageTime: string;
   result: AlgorithmResult;
   profileId?: TpLinkProfileId;
+  qualifiedRate?: number;
 }
 
 export interface InspectionFailure {
@@ -155,6 +156,7 @@ export interface MessageItem {
   id: string;
   taskId: string;
   runId?: string;
+  resultId?: string;
   type: "inspection_unqualified";
   read: boolean;
   title: string;
@@ -184,6 +186,7 @@ export interface InspectionOverview {
   qualifiedCount: number;
   unqualifiedCount: number;
   messageCount: number;
+  qualifiedRate: number;
   unqualifiedRate: number;
 }
 
@@ -192,6 +195,7 @@ export interface TrendPoint {
   qualifiedCount: number;
   unqualifiedCount: number;
   messageCount: number;
+  qualifiedRate: number;
   unqualifiedRate: number;
 }
 
@@ -216,4 +220,14 @@ export interface AppSnapshot {
   failures: InspectionFailure[];
   messages: MessageItem[];
   media: MediaAsset[];
+  schedulerScans: SchedulerScan[];
+}
+
+export interface SchedulerScan {
+  id: string;
+  scannedAt: string;
+  dueCount: number;
+  completedCount: number;
+  failedCount: number;
+  errorSummary?: string;
 }

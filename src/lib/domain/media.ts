@@ -57,31 +57,33 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function ensureReplayMediaForResult(resultId: string): Promise<MediaAsset> {
+async function ensureReplayMediaForSource(input: {
+  cacheId: string;
+  taskId: string;
+  qrCode: string;
+  channelId: number;
+  imageTime: string;
+  profileId?: string;
+}): Promise<MediaAsset> {
   const snapshot = await getAppSnapshot();
-  const cached = snapshot.media.find((item) => item.kind === "video" && item.id === `video_result_${resultId}`);
+  const cached = snapshot.media.find((item) => item.kind === "video" && item.id === input.cacheId);
   if (cached) {
     return cached;
   }
 
-  const result = snapshot.results.find((item) => item.id === resultId);
-  if (!result) {
-    throw new Error("Result not found.");
-  }
-
-  const center = new Date(result.imageTime);
+  const center = new Date(input.imageTime);
   const start = new Date(center.getTime() - 30 * 1000);
   const end = new Date(center.getTime() + 30 * 1000);
 
   const submitResponse = await submitTpLinkCaptureVideoTask(
     {
-      qrCode: result.qrCode,
-      channelId: result.channelId,
+      qrCode: input.qrCode,
+      channelId: input.channelId,
       playbackStartTime: formatTpLinkDateTime(start),
       playbackEndTime: formatTpLinkDateTime(end),
       expireDays: 1
     },
-    result.profileId
+    input.profileId
   );
 
   if (submitResponse.error_code !== 0 || !submitResponse.result?.taskId) {
@@ -90,14 +92,14 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
 
   const taskId = submitResponse.result.taskId;
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const info = await getTpLinkVideoTaskInfo(taskId, result.profileId);
+    const info = await getTpLinkVideoTaskInfo(taskId, input.profileId);
     if (info.error_code !== 0) {
       throw new Error(`TP-LINK replay task info failed: error_code=${info.error_code}`);
     }
 
     const state = info.result?.state;
     if (state === 10) {
-      const files = await getTpLinkVideoTaskFilePage(taskId, result.profileId);
+      const files = await getTpLinkVideoTaskFilePage(taskId, input.profileId);
       if (files.error_code !== 0) {
         throw new Error(`TP-LINK replay file query failed: error_code=${files.error_code}`);
       }
@@ -108,9 +110,9 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
       }
 
       const asset: MediaAsset = {
-        id: `video_result_${resultId}`,
+        id: input.cacheId,
         kind: "video",
-        taskId: result.taskId,
+        taskId: input.taskId,
         url,
         expiresAt: files.result?.list?.[0]?.expireTime ?? new Date(Date.now() + 10 * 60 * 1000).toISOString()
       };
@@ -130,6 +132,22 @@ export async function ensureReplayMediaForResult(resultId: string): Promise<Medi
   throw new Error("TP-LINK replay task timed out. Please try again later.");
 }
 
+export async function ensureReplayMediaForResult(resultId: string): Promise<MediaAsset> {
+  const snapshot = await getAppSnapshot();
+  const result = snapshot.results.find((item) => item.id === resultId);
+  if (!result) {
+    throw new Error("Result not found.");
+  }
+  return ensureReplayMediaForSource({
+    cacheId: `video_result_${resultId}`,
+    taskId: result.taskId,
+    qrCode: result.qrCode,
+    channelId: result.channelId,
+    imageTime: result.imageTime,
+    profileId: result.profileId
+  });
+}
+
 export async function ensureReplayMediaForMessage(messageId: string): Promise<MediaAsset> {
   const snapshot = await getAppSnapshot();
   const message = snapshot.messages.find((item) => item.id === messageId);
@@ -138,6 +156,7 @@ export async function ensureReplayMediaForMessage(messageId: string): Promise<Me
   }
 
   const matchedResult =
+    (message.resultId ? snapshot.results.find((item) => item.id === message.resultId) : null) ??
     snapshot.results.find(
       (item) =>
         item.taskId === message.taskId &&
@@ -149,9 +168,20 @@ export async function ensureReplayMediaForMessage(messageId: string): Promise<Me
       (item) => item.taskId === message.taskId && item.qrCode === message.qrCode && item.algorithmId === message.algorithmId
     );
 
-  if (!matchedResult) {
-    throw new Error("No replayable result found for this message.");
+  if (matchedResult) {
+    return ensureReplayMediaForResult(matchedResult.id);
   }
 
-  return ensureReplayMediaForResult(matchedResult.id);
+  if (!message.createdAt) {
+    throw new Error("No replay data to fetch for this message.");
+  }
+
+  return ensureReplayMediaForSource({
+    cacheId: `video_message_${messageId}`,
+    taskId: message.taskId,
+    qrCode: message.qrCode,
+    channelId: message.channelId,
+    imageTime: message.createdAt,
+    profileId: message.profileId
+  });
 }

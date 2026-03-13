@@ -16,6 +16,7 @@ import type {
   MessageItem,
   PurchaseRecord,
   RegionShape,
+  SchedulerScan,
   ServiceBalance
 } from "@/lib/types";
 import { getMemoryStore } from "@/lib/repositories/memory-store";
@@ -28,6 +29,11 @@ type MaybeStore = ReturnType<typeof getMemoryStore>;
 
 function isMissingTableError(error: unknown) {
   return error instanceof PostgrestError && error.code === "PGRST205";
+}
+
+function isMissingColumnError(error: unknown) {
+  if (!(error instanceof PostgrestError)) return false;
+  return error.code === "PGRST204" || error.code === "42703" || /column/i.test(error.message);
 }
 
 function toDateString(value: string | null | undefined) {
@@ -136,7 +142,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
     resultRes,
     failureRes,
     messageRes,
-    mediaRes
+    mediaRes,
+    schedulerScanRes
   ] = await Promise.all([
     client.from("service_balance").select("*").eq("id", INITIAL_BALANCE_ID).maybeSingle(),
     client.from("purchase_records").select("*").order("created_at", { ascending: false }),
@@ -149,7 +156,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
     client.from("inspection_results").select("*").order("image_time", { ascending: false }),
     client.from("inspection_failures").select("*"),
     client.from("messages").select("*").order("created_at", { ascending: false }),
-    client.from("message_media").select("*")
+    client.from("message_media").select("*"),
+    client.from("scheduler_scans").select("*").order("scanned_at", { ascending: false }).limit(50)
   ]);
 
   const errors = [
@@ -164,7 +172,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
     resultRes.error,
     failureRes.error,
     messageRes.error,
-    mediaRes.error
+    mediaRes.error,
+    schedulerScanRes.error && !isMissingTableError(schedulerScanRes.error) ? schedulerScanRes.error : null
   ].filter(Boolean);
   if (errors.length > 0) {
     throw errors[0];
@@ -201,7 +210,9 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
         name: row.name,
         status: row.status,
         groupName: row.group_name,
-        previewImage: row.preview_image
+        previewImage: row.preview_image,
+        profileId: row.profile_id ?? undefined,
+        profileName: row.profile_name ?? undefined
       });
   }
 
@@ -226,13 +237,29 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
   const tasks = Array.from(tasksById.values());
   const resultQrCodes = Array.from(new Set((resultRes.data ?? []).map((row) => row.qr_code).filter(Boolean)));
   const devices = await loadDevices(tasks.flatMap((task) => task.devices), resultQrCodes);
+  const deviceByCompositeKey = new Map<string, DeviceRef>(
+    devices.map((device) => [`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device] as const)
+  );
   const deviceByQrCode = new Map(devices.map((device) => [device.qrCode, device] as const));
 
   for (const task of tasks) {
     task.devices = Array.from(
       new Map(
         task.devices
-          .map((device) => ({ ...device, ...(deviceByQrCode.get(device.qrCode) ?? {}) }))
+          .map((device) => {
+            const compositeKey = `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
+            const matched =
+              deviceByCompositeKey.get(compositeKey) ??
+              Array.from(deviceByCompositeKey.values()).find(
+                (candidate) =>
+                  candidate.qrCode === device.qrCode &&
+                  candidate.channelId === device.channelId &&
+                  (!device.mac || !candidate.mac || device.mac === candidate.mac)
+              ) ??
+              deviceByQrCode.get(device.qrCode);
+
+            return { ...device, ...(matched ?? {}) };
+          })
           .map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)
       ).values()
     );
@@ -306,7 +333,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       failedChecks: row.failed_checks,
       chargedUnits: row.charged_units,
       refundedUnits: row.refunded_units,
-      tpLinkTaskId: row.tplink_task_id ?? undefined
+      tpLinkTaskId: row.tplink_task_id ?? undefined,
+      profileId: row.profile_id ?? undefined
     })),
     results: (resultRes.data ?? []).map<InspectionResult>((row) => ({
       id: row.id,
@@ -318,7 +346,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       algorithmVersion: row.algorithm_version,
       imageUrl: row.image_url,
       imageTime: row.image_time,
-      result: row.result
+      result: row.result,
+      profileId: row.profile_id ?? undefined
     })),
     failures: (failureRes.data ?? []).map<InspectionFailure>((row) => ({
       id: row.id,
@@ -334,6 +363,7 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       id: row.id,
       taskId: row.task_id,
       runId: row.run_id ?? undefined,
+      resultId: row.result_id ?? undefined,
       type: row.type,
       read: row.read,
       title: row.title,
@@ -345,7 +375,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       createdAt: row.created_at,
       imageUrl: row.image_url ?? undefined,
       imageId: row.image_id ?? undefined,
-      videoTaskId: row.video_task_id ?? undefined
+      videoTaskId: row.video_task_id ?? undefined,
+      profileId: row.profile_id ?? undefined
     })),
     media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
       id: row.id,
@@ -354,6 +385,14 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
       taskId: row.task_id ?? undefined,
       url: row.url,
       expiresAt: row.expires_at
+    })),
+    schedulerScans: (schedulerScanRes.data ?? []).map<SchedulerScan>((row) => ({
+      id: row.id,
+      scannedAt: row.scanned_at,
+      dueCount: row.due_count,
+      completedCount: row.completed_count,
+      failedCount: row.failed_count,
+      errorSummary: row.error_summary ?? undefined
     }))
   };
 }
@@ -444,19 +483,25 @@ export async function getAppStore() {
       await client.from("inspection_task_regions").delete().eq("task_id", task.id);
 
       if (task.devices.length > 0) {
-        const { error } = await client.from("inspection_task_devices").insert(
-          task.devices.map((device) => ({
-            id: slugId("taskdev"),
-            task_id: task.id,
-            qr_code: device.qrCode,
-            mac: device.mac ?? null,
-            channel_id: device.channelId,
-            name: device.name,
-            status: device.status,
-            group_name: device.groupName,
-          preview_image: device.previewImage
-        }))
-      );
+        const deviceRows = task.devices.map((device) => ({
+          id: slugId("taskdev"),
+          task_id: task.id,
+          qr_code: device.qrCode,
+          mac: device.mac ?? null,
+          channel_id: device.channelId,
+          name: device.name,
+          status: device.status,
+          group_name: device.groupName,
+          preview_image: device.previewImage,
+          profile_id: device.profileId ?? null,
+          profile_name: device.profileName ?? null
+        }));
+        let { error } = await client.from("inspection_task_devices").insert(deviceRows);
+        if (error && isMissingColumnError(error)) {
+          ({ error } = await client.from("inspection_task_devices").insert(
+            deviceRows.map(({ profile_id: _profileId, profile_name: _profileName, ...legacyRow }) => legacyRow)
+          ));
+        }
         if (error) throw error;
       }
 
@@ -493,7 +538,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async addRun(run: InspectionRun) {
-      const { error } = await client.from("inspection_runs").insert({
+      let { error } = await client.from("inspection_runs").insert({
         id: run.id,
         task_id: run.taskId,
         started_at: run.startedAt,
@@ -504,12 +549,28 @@ export async function getAppStore() {
         failed_checks: run.failedChecks,
         charged_units: run.chargedUnits,
         refunded_units: run.refundedUnits,
-        tplink_task_id: run.tpLinkTaskId ?? null
+        tplink_task_id: run.tpLinkTaskId ?? null,
+        profile_id: run.profileId ?? null
       });
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client.from("inspection_runs").insert({
+          id: run.id,
+          task_id: run.taskId,
+          started_at: run.startedAt,
+          completed_at: run.completedAt ?? null,
+          status: run.status,
+          total_checks: run.totalChecks,
+          successful_checks: run.successfulChecks,
+          failed_checks: run.failedChecks,
+          charged_units: run.chargedUnits,
+          refunded_units: run.refundedUnits,
+          tplink_task_id: run.tpLinkTaskId ?? null
+        }));
+      }
       if (error) throw error;
     },
     async updateRun(run: InspectionRun) {
-      const { error } = await client
+      let { error } = await client
         .from("inspection_runs")
         .update({
           completed_at: run.completedAt ?? null,
@@ -519,15 +580,30 @@ export async function getAppStore() {
           failed_checks: run.failedChecks,
           charged_units: run.chargedUnits,
           refunded_units: run.refundedUnits,
-          tplink_task_id: run.tpLinkTaskId ?? null
+          tplink_task_id: run.tpLinkTaskId ?? null,
+          profile_id: run.profileId ?? null
         })
         .eq("id", run.id);
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client
+          .from("inspection_runs")
+          .update({
+            completed_at: run.completedAt ?? null,
+            status: run.status,
+            total_checks: run.totalChecks,
+            successful_checks: run.successfulChecks,
+            failed_checks: run.failedChecks,
+            charged_units: run.chargedUnits,
+            refunded_units: run.refundedUnits,
+            tplink_task_id: run.tpLinkTaskId ?? null
+          })
+          .eq("id", run.id));
+      }
       if (error) throw error;
     },
     async addResults(nextResults: InspectionResult[]) {
       if (nextResults.length === 0) return;
-      const { error } = await client.from("inspection_results").upsert(
-        nextResults.map((item) => ({
+      const resultRows = nextResults.map((item) => ({
           id: item.id,
           run_id: item.runId,
           task_id: item.taskId,
@@ -537,10 +613,16 @@ export async function getAppStore() {
           algorithm_version: item.algorithmVersion,
           image_url: item.imageUrl,
           image_time: item.imageTime,
-          result: item.result
-        })),
-        { onConflict: "id" }
-      );
+          result: item.result,
+          profile_id: item.profileId ?? null
+        }));
+      let { error } = await client.from("inspection_results").upsert(resultRows, { onConflict: "id" });
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client.from("inspection_results").upsert(
+          resultRows.map(({ profile_id: _profileId, ...legacyRow }) => legacyRow),
+          { onConflict: "id" }
+        ));
+      }
       if (error) throw error;
     },
     async addFailures(nextFailures: InspectionFailure[]) {
@@ -562,11 +644,11 @@ export async function getAppStore() {
     },
     async addMessages(nextMessages: MessageItem[]) {
       if (nextMessages.length === 0) return;
-      const { error } = await client.from("messages").upsert(
-        nextMessages.map((item) => ({
+      const messageRows = nextMessages.map((item) => ({
           id: item.id,
           task_id: item.taskId,
           run_id: item.runId ?? null,
+          result_id: item.resultId ?? null,
           type: item.type,
           read: item.read,
           title: item.title,
@@ -578,25 +660,47 @@ export async function getAppStore() {
           created_at: item.createdAt,
           image_url: item.imageUrl ?? null,
           image_id: item.imageId ?? null,
-          video_task_id: item.videoTaskId ?? null
-        })),
-        { onConflict: "id" }
-      );
+          video_task_id: item.videoTaskId ?? null,
+          profile_id: item.profileId ?? null
+        }));
+      let { error } = await client.from("messages").upsert(messageRows, { onConflict: "id" });
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client.from("messages").upsert(
+          messageRows.map(({ result_id: _resultId, profile_id: _profileId, ...legacyRow }) => legacyRow),
+          { onConflict: "id" }
+        ));
+      }
       if (error) throw error;
     },
     async updateMessage(message: MessageItem) {
-      const { error } = await client
+      let { error } = await client
         .from("messages")
         .update({
+          result_id: message.resultId ?? null,
           read: message.read,
           title: message.title,
           description: message.description,
           result: message.result,
           image_url: message.imageUrl ?? null,
           image_id: message.imageId ?? null,
-          video_task_id: message.videoTaskId ?? null
+          video_task_id: message.videoTaskId ?? null,
+          profile_id: message.profileId ?? null
         })
         .eq("id", message.id);
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client
+          .from("messages")
+          .update({
+            read: message.read,
+            title: message.title,
+            description: message.description,
+            result: message.result,
+            image_url: message.imageUrl ?? null,
+            image_id: message.imageId ?? null,
+            video_task_id: message.videoTaskId ?? null
+          })
+          .eq("id", message.id));
+      }
       if (error) throw error;
     },
     async addMedia(asset: MediaAsset) {
@@ -612,6 +716,20 @@ export async function getAppStore() {
         { onConflict: "id" }
       );
       if (error) throw error;
+    },
+    async addSchedulerScan(scan: SchedulerScan) {
+      const { error } = await client.from("scheduler_scans").upsert(
+        {
+          id: scan.id,
+          scanned_at: scan.scannedAt,
+          due_count: scan.dueCount,
+          completed_count: scan.completedCount,
+          failed_count: scan.failedCount,
+          error_summary: scan.errorSummary ?? null
+        },
+        { onConflict: "id" }
+      );
+      if (error && !isMissingTableError(error) && !isMissingColumnError(error)) throw error;
     }
   };
 }

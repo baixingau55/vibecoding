@@ -11,6 +11,7 @@ import type {
   MessageItem,
   PurchaseRecord,
   RegionShape,
+  SchedulerScan,
   ServiceBalance
 } from "@/lib/types";
 
@@ -193,7 +194,8 @@ const runs: InspectionRun[] = [
     failedChecks: 0,
     chargedUnits: 1,
     refundedUnits: 0,
-    tpLinkTaskId: "tplink_run_001"
+    tpLinkTaskId: "tplink_run_001",
+    profileId: "primary"
   },
   {
     id: "run_002",
@@ -206,7 +208,8 @@ const runs: InspectionRun[] = [
     failedChecks: 1,
     chargedUnits: 2,
     refundedUnits: 1,
-    tpLinkTaskId: "tplink_run_002"
+    tpLinkTaskId: "tplink_run_002",
+    profileId: "primary"
   }
 ];
 
@@ -221,7 +224,8 @@ const results: InspectionResult[] = [
     algorithmVersion: "1.2.0",
     imageUrl: devices[0].previewImage,
     imageTime: new Date(now.getTime() - 1000 * 60 * 120).toISOString(),
-    result: "QUALIFIED"
+    result: "QUALIFIED",
+    profileId: "primary"
   },
   {
     id: "result_002",
@@ -233,7 +237,8 @@ const results: InspectionResult[] = [
     algorithmVersion: "1.2.0",
     imageUrl: devices[0].previewImage,
     imageTime: new Date(now.getTime() - 1000 * 60 * 60).toISOString(),
-    result: "UNQUALIFIED"
+    result: "UNQUALIFIED",
+    profileId: "primary"
   }
 ];
 
@@ -255,6 +260,7 @@ const messages: MessageItem[] = [
     id: "msg_001",
     taskId: "task_away_post",
     runId: "run_002",
+    resultId: "result_002",
     type: "inspection_unqualified",
     read: false,
     title: "离岗检测巡检不合格",
@@ -266,7 +272,18 @@ const messages: MessageItem[] = [
     createdAt: new Date(now.getTime() - 1000 * 60 * 60).toISOString(),
     imageUrl: devices[0].previewImage,
     imageId: "media_image_001",
-    videoTaskId: "media_video_001"
+    videoTaskId: "media_video_001",
+    profileId: "primary"
+  }
+];
+
+const schedulerScans: SchedulerScan[] = [
+  {
+    id: "scan_001",
+    scannedAt: new Date(now.getTime() - 1000 * 60).toISOString(),
+    dueCount: 1,
+    completedCount: 1,
+    failedCount: 0
   }
 ];
 
@@ -301,6 +318,7 @@ export function createMockSnapshot(): AppSnapshot {
     results,
     failures,
     messages,
-    media
+    media,
+    schedulerScans
   };
 }

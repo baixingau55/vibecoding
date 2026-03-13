@@ -22,7 +22,7 @@ export function AnalyticsDashboard({
   rankings: Record<RankingMetric, RankedTask[]>;
 }) {
   const [rankingMetric, setRankingMetric] = useState<"unqualifiedRate" | "unqualifiedCount" | "messageCount">("unqualifiedRate");
-  const [trendMetric, setTrendMetric] = useState<"unqualifiedRate" | "qualifiedCount" | "messageCount">("unqualifiedRate");
+  const [trendMetric, setTrendMetric] = useState<"unqualifiedRate" | "qualifiedRate" | "messageCount">("unqualifiedRate");
   const [sortDirection, setSortDirection] = useState<"desc" | "asc">("desc");
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -57,7 +57,7 @@ export function AnalyticsDashboard({
 
   const filteredOverview = useMemo<InspectionOverview>(() => {
     if (filteredTrends.length === 0) {
-      return { totalChecks: 0, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, unqualifiedRate: 0 };
+      return { totalChecks: 0, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, qualifiedRate: 0, unqualifiedRate: 0 };
     }
     const qualifiedCount = filteredTrends.reduce((sum, item) => sum + item.qualifiedCount, 0);
     const unqualifiedCount = filteredTrends.reduce((sum, item) => sum + item.unqualifiedCount, 0);
@@ -68,11 +68,12 @@ export function AnalyticsDashboard({
       qualifiedCount,
       unqualifiedCount,
       messageCount,
+      qualifiedRate: totalChecks === 0 ? 0 : (qualifiedCount / totalChecks) * 100,
       unqualifiedRate: totalChecks === 0 ? 0 : (unqualifiedCount / totalChecks) * 100
     };
   }, [filteredTrends]);
 
-  const trendTitle = trendMetric === "qualifiedCount" ? "任务合格率趋势" : trendMetric === "messageCount" ? "任务消息提醒次数趋势" : "任务不合格率趋势";
+  const trendTitle = trendMetric === "qualifiedRate" ? "任务合格率趋势" : trendMetric === "messageCount" ? "任务消息提醒次数趋势" : "任务不合格率趋势";
   const rankingLabel = rankingMetric === "unqualifiedCount" ? "不合格次数" : rankingMetric === "messageCount" ? "消息提醒次数" : "不合格率";
 
   return (
@@ -187,7 +188,7 @@ export function AnalyticsDashboard({
             <span className="ai-subtle-note">（每小时更新一次数据）</span>
           </div>
           <div className="ai-chart-segmented">
-            <button type="button" className={cn("ai-chart-tab", trendMetric === "qualifiedCount" && "ai-chart-tab-active")} onClick={() => setTrendMetric("qualifiedCount")}>
+            <button type="button" className={cn("ai-chart-tab", trendMetric === "qualifiedRate" && "ai-chart-tab-active")} onClick={() => setTrendMetric("qualifiedRate")}>
               合格率
             </button>
             <button type="button" className={cn("ai-chart-tab", trendMetric === "unqualifiedRate" && "ai-chart-tab-active")} onClick={() => setTrendMetric("unqualifiedRate")}>
@@ -200,7 +201,7 @@ export function AnalyticsDashboard({
         </div>
 
         <div className="ai-trend-chart">
-          <TrendChart data={filteredTrends} />
+          <TrendChart data={filteredTrends} metric={trendMetric} />
         </div>
 
         <table className="ai-table ai-trend-table">
@@ -218,8 +219,8 @@ export function AnalyticsDashboard({
                 <td>{task.taskName}</td>
                 {filteredTrends.map((point) => (
                   <td key={`${task.taskId}-${point.label}`}>
-                    {trendMetric === "qualifiedCount"
-                      ? `${Math.max(0, 100 - Math.round(point.unqualifiedRate))}%`
+                    {trendMetric === "qualifiedRate"
+                      ? formatPercent(point.qualifiedRate)
                       : trendMetric === "messageCount"
                         ? point.messageCount
                         : formatPercent(point.unqualifiedRate)}

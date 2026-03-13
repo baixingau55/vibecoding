@@ -19,7 +19,8 @@ import type {
   InspectionTask,
   MediaAsset,
   MessageItem,
-  RegionShape
+  RegionShape,
+  SchedulerScan
 } from "@/lib/types";
 
 type TaskInput = Pick<
@@ -163,6 +164,7 @@ function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: In
     id: slugId("msg"),
     taskId: task.id,
     runId,
+    resultId: result.id,
     type: "inspection_unqualified",
     read: false,
     title: `${task.name} 巡检不合格`,
@@ -289,12 +291,27 @@ export async function triggerDueTasks(now = new Date()) {
     }
   }
 
-  return {
+  const summary = {
     scannedAt: now.toISOString(),
     dueCount: dueTasks.length,
     completed,
     failed
   };
+
+  const store = await getAppStore();
+  if ("addSchedulerScan" in store && typeof store.addSchedulerScan === "function") {
+    const scan: SchedulerScan = {
+      id: slugId("scan"),
+      scannedAt: summary.scannedAt,
+      dueCount: summary.dueCount,
+      completedCount: summary.completed.length,
+      failedCount: summary.failed.length,
+      errorSummary: summary.failed.map((item) => `${item.taskId}: ${item.error}`).join(" | ") || undefined
+    };
+    await store.addSchedulerScan(scan);
+  }
+
+  return summary;
 }
 
 export async function getTaskById(id: string) {

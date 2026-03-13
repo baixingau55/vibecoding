@@ -9,6 +9,7 @@ import type {
   MediaAsset,
   MessageItem,
   PurchaseRecord,
+  SchedulerScan,
   ServiceBalance
 } from "@/lib/types";
 
@@ -85,6 +86,10 @@ export function getMemoryStore() {
     },
     addMedia(asset: MediaAsset) {
       store.media.unshift(clone(asset));
+    },
+    addSchedulerScan(scan: SchedulerScan) {
+      store.schedulerScans.unshift(clone(scan));
+      store.schedulerScans = store.schedulerScans.slice(0, 100);
     }
   };
 }

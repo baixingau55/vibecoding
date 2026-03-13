@@ -295,13 +295,7 @@ export function TaskBuilder({
 
     if (shouldExit) {
       const target = method === "PATCH" && initialTask ? `/tasks/${initialTask.id}` : redirectTo;
-      router.replace(target);
-      router.refresh();
-      window.setTimeout(() => {
-        if (window.location.pathname !== target) {
-          window.location.assign(target);
-        }
-      }, 150);
+      window.location.replace(target);
     }
 
     return true;

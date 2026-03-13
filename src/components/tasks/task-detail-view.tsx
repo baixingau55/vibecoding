@@ -18,13 +18,13 @@ function cn(...parts: Array<string | false | null | undefined>) {
 function buildTrend(results: InspectionResult[], messages: MessageItem[]) {
   const grouped = new Map<
     string,
-    { label: string; qualifiedCount: number; unqualifiedCount: number; messageCount: number; unqualifiedRate: number }
+    { label: string; qualifiedCount: number; unqualifiedCount: number; messageCount: number; qualifiedRate: number; unqualifiedRate: number }
   >();
 
   for (const result of results) {
     if (result.result === "UNAVAILABLE") continue;
     const key = result.imageTime.slice(5, 10);
-    const current = grouped.get(key) ?? { label: key, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, unqualifiedRate: 0 };
+    const current = grouped.get(key) ?? { label: key, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, qualifiedRate: 0, unqualifiedRate: 0 };
     if (result.result === "QUALIFIED") current.qualifiedCount += 1;
     if (result.result === "UNQUALIFIED") current.unqualifiedCount += 1;
     grouped.set(key, current);
@@ -32,7 +32,7 @@ function buildTrend(results: InspectionResult[], messages: MessageItem[]) {
 
   for (const message of messages) {
     const key = message.createdAt.slice(5, 10);
-    const current = grouped.get(key) ?? { label: key, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, unqualifiedRate: 0 };
+    const current = grouped.get(key) ?? { label: key, qualifiedCount: 0, unqualifiedCount: 0, messageCount: 0, qualifiedRate: 0, unqualifiedRate: 0 };
     current.messageCount += 1;
     grouped.set(key, current);
   }
@@ -41,6 +41,7 @@ function buildTrend(results: InspectionResult[], messages: MessageItem[]) {
     .sort((a, b) => a.label.localeCompare(b.label))
     .map((item) => ({
       ...item,
+      qualifiedRate: item.qualifiedCount + item.unqualifiedCount === 0 ? 0 : (item.qualifiedCount / (item.qualifiedCount + item.unqualifiedCount)) * 100,
       unqualifiedRate: item.qualifiedCount + item.unqualifiedCount === 0 ? 0 : (item.unqualifiedCount / (item.qualifiedCount + item.unqualifiedCount)) * 100
     }));
 }
@@ -70,7 +71,7 @@ export function TaskDetailView({
   const [logsOpen, setLogsOpen] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [metric, setMetric] = useState<"unqualified" | "qualified" | "message">("unqualified");
+  const [metric, setMetric] = useState<"unqualifiedRate" | "qualifiedRate" | "messageCount">("unqualifiedRate");
   const [recordTab, setRecordTab] = useState<"all" | "qualified" | "unqualified">("all");
   const [notice, setNotice] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -259,18 +260,18 @@ export function TaskDetailView({
             <div className="ai-detail-chart-head">
               <strong>{algorithmName}趋势</strong>
               <div className="ai-chart-segmented">
-                <button type="button" className={cn("ai-chart-tab", metric === "unqualified" && "ai-chart-tab-active")} onClick={() => setMetric("unqualified")}>
+                <button type="button" className={cn("ai-chart-tab", metric === "unqualifiedRate" && "ai-chart-tab-active")} onClick={() => setMetric("unqualifiedRate")}>
                   不合格率
                 </button>
-                <button type="button" className={cn("ai-chart-tab", metric === "qualified" && "ai-chart-tab-active")} onClick={() => setMetric("qualified")}>
+                <button type="button" className={cn("ai-chart-tab", metric === "qualifiedRate" && "ai-chart-tab-active")} onClick={() => setMetric("qualifiedRate")}>
                   合格率
                 </button>
-                <button type="button" className={cn("ai-chart-tab", metric === "message" && "ai-chart-tab-active")} onClick={() => setMetric("message")}>
+                <button type="button" className={cn("ai-chart-tab", metric === "messageCount" && "ai-chart-tab-active")} onClick={() => setMetric("messageCount")}>
                   提醒次数
                 </button>
               </div>
             </div>
-            <TrendChart data={trendData} />
+            <TrendChart data={trendData} metric={metric} />
           </div>
         </div>
 

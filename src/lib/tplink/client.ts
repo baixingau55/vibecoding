@@ -6,6 +6,11 @@ const TP_LINK_HOST = "api-smbcloud.tp-link.com.cn";
 const TP_LINK_ENDPOINT = `https://${TP_LINK_HOST}`;
 const DEVICE_PREVIEW_IMAGE =
   "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
+const DEVICE_CACHE_TTL_MS = 60 * 1000;
+
+let cachedDeviceList: DeviceRef[] | null = null;
+let cachedDeviceListAt = 0;
+let deviceListInFlight: Promise<DeviceRef[]> | null = null;
 
 function getProfile(profileId?: TpLinkProfileId) {
   const profiles = getTpLinkProfiles();
@@ -212,6 +217,15 @@ export async function fetchTpLinkAlgorithms() {
 }
 
 export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
+  if (cachedDeviceList && Date.now() - cachedDeviceListAt < DEVICE_CACHE_TTL_MS) {
+    return cachedDeviceList;
+  }
+
+  if (deviceListInFlight) {
+    return deviceListInFlight;
+  }
+
+  deviceListInFlight = (async () => {
   const endpoints = [
     "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
     "/tums/open/deviceManager/v1/getDeviceListInProjectApplication"
@@ -275,7 +289,17 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
     throw lastError;
   }
 
-  return Array.from(merged.values());
+    const devices = Array.from(merged.values());
+    cachedDeviceList = devices;
+    cachedDeviceListAt = Date.now();
+    return devices;
+  })();
+
+  try {
+    return await deviceListInFlight;
+  } finally {
+    deviceListInFlight = null;
+  }
 }
 
 export async function fetchTpLinkDeviceByQrCode(qrCode: string, profileId?: TpLinkProfileId): Promise<DeviceRef | null> {

@@ -2,8 +2,7 @@ import type { InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "
 
 import { getAppSnapshot } from "@/lib/domain/store";
 
-export async function getInspectionOverview(): Promise<InspectionOverview> {
-  const snapshot = await getAppSnapshot();
+function buildInspectionOverview(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>): InspectionOverview {
   const successfulResults = snapshot.results.filter((item) => item.result !== "UNAVAILABLE");
   const qualifiedCount = successfulResults.filter((item) => item.result === "QUALIFIED").length;
   const unqualifiedCount = successfulResults.filter((item) => item.result === "UNQUALIFIED").length;
@@ -15,12 +14,12 @@ export async function getInspectionOverview(): Promise<InspectionOverview> {
     qualifiedCount,
     unqualifiedCount,
     messageCount,
+    qualifiedRate: totalChecks === 0 ? 0 : (qualifiedCount / totalChecks) * 100,
     unqualifiedRate: totalChecks === 0 ? 0 : (unqualifiedCount / totalChecks) * 100
   };
 }
 
-export async function getTrendPoints(): Promise<TrendPoint[]> {
-  const snapshot = await getAppSnapshot();
+function buildTrendPoints(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>): TrendPoint[] {
   const grouped = new Map<string, TrendPoint>();
 
   for (const result of snapshot.results) {
@@ -31,6 +30,7 @@ export async function getTrendPoints(): Promise<TrendPoint[]> {
       qualifiedCount: 0,
       unqualifiedCount: 0,
       messageCount: 0,
+      qualifiedRate: 0,
       unqualifiedRate: 0
     };
 
@@ -46,6 +46,7 @@ export async function getTrendPoints(): Promise<TrendPoint[]> {
       qualifiedCount: 0,
       unqualifiedCount: 0,
       messageCount: 0,
+      qualifiedRate: 0,
       unqualifiedRate: 0
     };
     existing.messageCount += 1;
@@ -58,14 +59,13 @@ export async function getTrendPoints(): Promise<TrendPoint[]> {
       const total = point.qualifiedCount + point.unqualifiedCount;
       return {
         ...point,
+        qualifiedRate: total === 0 ? 0 : (point.qualifiedCount / total) * 100,
         unqualifiedRate: total === 0 ? 0 : (point.unqualifiedCount / total) * 100
       };
     });
 }
 
-export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[]> {
-  const snapshot = await getAppSnapshot();
-
+function buildRankedTasks(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>, metric: RankingMetric): RankedTask[] {
   const rankings = snapshot.tasks.map<RankedTask>((task) => {
     const results = snapshot.results.filter((item) => item.taskId === task.id && item.result !== "UNAVAILABLE");
     const messages = snapshot.messages.filter((item) => item.taskId === task.id);
@@ -84,3 +84,27 @@ export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[
   return rankings.sort((a, b) => b[metric] - a[metric]);
 }
 
+export async function getInspectionOverview(): Promise<InspectionOverview> {
+  return buildInspectionOverview(await getAppSnapshot());
+}
+
+export async function getTrendPoints(): Promise<TrendPoint[]> {
+  return buildTrendPoints(await getAppSnapshot());
+}
+
+export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[]> {
+  return buildRankedTasks(await getAppSnapshot(), metric);
+}
+
+export async function getAnalyticsPayload() {
+  const snapshot = await getAppSnapshot();
+  return {
+    overview: buildInspectionOverview(snapshot),
+    trends: buildTrendPoints(snapshot),
+    rankings: {
+      unqualifiedRate: buildRankedTasks(snapshot, "unqualifiedRate"),
+      unqualifiedCount: buildRankedTasks(snapshot, "unqualifiedCount"),
+      messageCount: buildRankedTasks(snapshot, "messageCount")
+    }
+  };
+}
