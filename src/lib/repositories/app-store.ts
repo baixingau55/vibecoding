@@ -22,10 +22,18 @@ import type {
 import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 const INITIAL_BALANCE_ID = "default";
+const READ_CACHE_TTL_MS = 5_000;
 const FALLBACK_DEVICE_PREVIEW =
   "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 
 type MaybeStore = ReturnType<typeof getMemoryStore>;
+type ReadCacheEntry<T> = {
+  expiresAt: number;
+  value?: T;
+  promise?: Promise<T>;
+};
+
+const readCache = new Map<string, ReadCacheEntry<unknown>>();
 
 function isMissingTableError(error: unknown) {
   return error instanceof PostgrestError && error.code === "PGRST205";
@@ -38,6 +46,38 @@ function isMissingColumnError(error: unknown) {
 
 function toDateString(value: string | null | undefined) {
   return value ?? undefined;
+}
+
+async function withReadCache<T>(key: string, loader: () => Promise<T>, ttlMs = READ_CACHE_TTL_MS): Promise<T> {
+  const now = Date.now();
+  const cached = readCache.get(key) as ReadCacheEntry<T> | undefined;
+
+  if (cached?.value !== undefined && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = loader()
+    .then((value) => {
+      readCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+      return value;
+    })
+    .finally(() => {
+      const latest = readCache.get(key) as ReadCacheEntry<T> | undefined;
+      if (latest?.promise) {
+        readCache.set(key, { value: latest.value, expiresAt: latest.expiresAt });
+      }
+    });
+
+  readCache.set(key, { promise, expiresAt: now + ttlMs });
+  return promise;
+}
+
+function invalidateReadCache() {
+  readCache.clear();
 }
 
 function composeTasks(
@@ -216,6 +256,7 @@ function buildKnownDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
 }
 
 async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot | null> {
+  return withReadCache(`snapshot:${includeDevices ? "with-devices" : "lite"}`, async () => {
   const client = getSupabaseAdminClient();
   if (!client) return null;
   if (!(await hasSupabaseSchema())) return null;
@@ -432,6 +473,7 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
       errorSummary: row.error_summary ?? undefined
     }))
   };
+  });
 }
 
 function getFallbackStore(): MaybeStore {
@@ -456,92 +498,101 @@ export async function getAppStore() {
       return snapshot;
     },
     async listTasksData() {
-      const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
-        client.from("inspection_tasks").select("*").order("updated_at", { ascending: false }),
-        client.from("inspection_task_devices").select("*"),
-        client.from("inspection_task_schedules").select("*"),
-        client.from("inspection_task_regions").select("*")
-      ]);
-      const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
-      if (errors.length > 0) throw errors[0];
-      return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+      return withReadCache("tasks:list", async () => {
+        const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
+          client.from("inspection_tasks").select("*").order("updated_at", { ascending: false }),
+          client.from("inspection_task_devices").select("*"),
+          client.from("inspection_task_schedules").select("*"),
+          client.from("inspection_task_regions").select("*")
+        ]);
+        const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+      });
     },
     async getMessagesData() {
-      const [messageRes, mediaRes] = await Promise.all([
-        client.from("messages").select("*").order("created_at", { ascending: false }),
-        client.from("message_media").select("*")
-      ]);
-      const errors = [messageRes.error, mediaRes.error].filter(Boolean);
-      if (errors.length > 0) throw errors[0];
-      return {
-        messages: (messageRes.data ?? []).map<MessageItem>((row) => ({
-          id: row.id,
-          taskId: row.task_id,
-          runId: row.run_id ?? undefined,
-          resultId: row.result_id ?? undefined,
-          type: row.type,
-          read: row.read,
-          title: row.title,
-          description: row.description,
-          result: row.result,
-          qrCode: row.qr_code,
-          channelId: row.channel_id,
-          algorithmId: row.algorithm_id,
-          createdAt: row.created_at,
-          imageUrl: row.image_url ?? undefined,
-          imageId: row.image_id ?? undefined,
-          videoTaskId: row.video_task_id ?? undefined,
-          profileId: row.profile_id ?? undefined
-        })),
-        media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
-          id: row.id,
-          kind: row.kind,
-          messageId: row.message_id ?? undefined,
-          taskId: row.task_id ?? undefined,
-          url: row.url,
-          expiresAt: row.expires_at
-        }))
-      };
+      return withReadCache("messages:list", async () => {
+        const [messageRes, mediaRes] = await Promise.all([
+          client.from("messages").select("*").order("created_at", { ascending: false }),
+          client.from("message_media").select("*")
+        ]);
+        const errors = [messageRes.error, mediaRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        return {
+          messages: (messageRes.data ?? []).map<MessageItem>((row) => ({
+            id: row.id,
+            taskId: row.task_id,
+            runId: row.run_id ?? undefined,
+            resultId: row.result_id ?? undefined,
+            type: row.type,
+            read: row.read,
+            title: row.title,
+            description: row.description,
+            result: row.result,
+            qrCode: row.qr_code,
+            channelId: row.channel_id,
+            algorithmId: row.algorithm_id,
+            createdAt: row.created_at,
+            imageUrl: row.image_url ?? undefined,
+            imageId: row.image_id ?? undefined,
+            videoTaskId: row.video_task_id ?? undefined,
+            profileId: row.profile_id ?? undefined
+          })),
+          media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
+            id: row.id,
+            kind: row.kind,
+            messageId: row.message_id ?? undefined,
+            taskId: row.task_id ?? undefined,
+            url: row.url,
+            expiresAt: row.expires_at
+          }))
+        };
+      });
     },
     async getAnalyticsData() {
-      const [taskRes, resultRes, messageRes] = await Promise.all([
-        client.from("inspection_tasks").select("id,name"),
-        client.from("inspection_results").select("task_id,result,image_time"),
-        client.from("messages").select("task_id,created_at")
-      ]);
-      const errors = [taskRes.error, resultRes.error, messageRes.error].filter(Boolean);
-      if (errors.length > 0) throw errors[0];
-      return {
-        tasks: (taskRes.data ?? []).map((row) => ({ id: row.id, name: row.name })),
-        results: (resultRes.data ?? []).map((row) => ({
-          taskId: row.task_id,
-          result: row.result,
-          imageTime: row.image_time
-        })),
-        messages: (messageRes.data ?? []).map((row) => ({
-          taskId: row.task_id,
-          createdAt: row.created_at
-        }))
-      };
+      return withReadCache("analytics:data", async () => {
+        const [taskRes, resultRes, messageRes] = await Promise.all([
+          client.from("inspection_tasks").select("id,name"),
+          client.from("inspection_results").select("task_id,result,image_time"),
+          client.from("messages").select("task_id,created_at")
+        ]);
+        const errors = [taskRes.error, resultRes.error, messageRes.error].filter(Boolean);
+        if (errors.length > 0) throw errors[0];
+        return {
+          tasks: (taskRes.data ?? []).map((row) => ({ id: row.id, name: row.name })),
+          results: (resultRes.data ?? []).map((row) => ({
+            taskId: row.task_id,
+            result: row.result,
+            imageTime: row.image_time
+          })),
+          messages: (messageRes.data ?? []).map((row) => ({
+            taskId: row.task_id,
+            createdAt: row.created_at
+          }))
+        };
+      });
     },
     async getTaskPreviewData() {
-      const { data, error } = await client
-        .from("inspection_results")
-        .select("task_id,qr_code,image_url,image_time")
-        .not("image_url", "is", null)
-        .order("image_time", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((row) => ({
-        taskId: row.task_id,
-        qrCode: row.qr_code,
-        imageUrl: row.image_url,
-        imageTime: row.image_time
-      }));
+      return withReadCache("tasks:preview", async () => {
+        const { data, error } = await client
+          .from("inspection_results")
+          .select("task_id,qr_code,image_url,image_time")
+          .not("image_url", "is", null)
+          .order("image_time", { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map((row) => ({
+          taskId: row.task_id,
+          qrCode: row.qr_code,
+          imageUrl: row.image_url,
+          imageTime: row.image_time
+        }));
+      });
     },
     async replace() {
       throw new Error("Supabase replace is not supported.");
     },
     async setBalance(balance: ServiceBalance) {
+      invalidateReadCache();
       const { error } = await client.from("service_balance").upsert(
         {
           id: INITIAL_BALANCE_ID,
@@ -556,6 +607,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async addPurchase(record: PurchaseRecord, ledgerEntry: BalanceLedgerEntry, nextBalance: ServiceBalance) {
+      invalidateReadCache();
       const { error: purchaseError } = await client.from("purchase_records").insert({
         id: record.id,
         created_at: record.createdAt,
@@ -579,6 +631,7 @@ export async function getAppStore() {
       await this.setBalance(nextBalance);
     },
     async upsertTask(task: InspectionTask) {
+      invalidateReadCache();
       const { error: taskError } = await client.from("inspection_tasks").upsert(
         {
           id: task.id,
@@ -654,10 +707,12 @@ export async function getAppStore() {
       }
     },
     async deleteTask(taskId: string) {
+      invalidateReadCache();
       const { error } = await client.from("inspection_tasks").delete().eq("id", taskId);
       if (error) throw error;
     },
     async addRun(run: InspectionRun) {
+      invalidateReadCache();
       let { error } = await client.from("inspection_runs").insert({
         id: run.id,
         task_id: run.taskId,
@@ -690,6 +745,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async updateRun(run: InspectionRun) {
+      invalidateReadCache();
       let { error } = await client
         .from("inspection_runs")
         .update({
@@ -723,6 +779,7 @@ export async function getAppStore() {
     },
     async addResults(nextResults: InspectionResult[]) {
       if (nextResults.length === 0) return;
+      invalidateReadCache();
       const resultRows = nextResults.map((item) => ({
           id: item.id,
           run_id: item.runId,
@@ -747,6 +804,7 @@ export async function getAppStore() {
     },
     async addFailures(nextFailures: InspectionFailure[]) {
       if (nextFailures.length === 0) return;
+      invalidateReadCache();
       const { error } = await client.from("inspection_failures").upsert(
         nextFailures.map((item) => ({
           id: item.id,
@@ -764,6 +822,7 @@ export async function getAppStore() {
     },
     async addMessages(nextMessages: MessageItem[]) {
       if (nextMessages.length === 0) return;
+      invalidateReadCache();
       const messageRows = nextMessages.map((item) => ({
           id: item.id,
           task_id: item.taskId,
@@ -793,6 +852,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async updateMessage(message: MessageItem) {
+      invalidateReadCache();
       let { error } = await client
         .from("messages")
         .update({
@@ -824,6 +884,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async addMedia(asset: MediaAsset) {
+      invalidateReadCache();
       const { error } = await client.from("message_media").upsert(
         {
           id: asset.id,
@@ -838,6 +899,7 @@ export async function getAppStore() {
       if (error) throw error;
     },
     async addSchedulerScan(scan: SchedulerScan) {
+      invalidateReadCache();
       const { error } = await client.from("scheduler_scans").upsert(
         {
           id: scan.id,
