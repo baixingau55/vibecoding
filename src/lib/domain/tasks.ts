@@ -56,6 +56,23 @@ function parseClock(value: string) {
   return { hour, minute, totalMinutes: hour * 60 + minute };
 }
 
+function dedupeSchedules(schedules: InspectionTask["schedules"]) {
+  return Array.from(
+    new Map(
+      schedules.map((schedule) => [
+        JSON.stringify({
+          type: schedule.type,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime ?? "",
+          repeatDays: [...schedule.repeatDays].sort((a, b) => a - b),
+          intervalMinutes: schedule.intervalMinutes ?? null
+        }),
+        schedule
+      ] as const)
+    ).values()
+  );
+}
+
 function getNextRunAt(schedules: InspectionTask["schedules"], from = new Date()) {
   if (schedules.length === 0) return undefined;
 
@@ -84,19 +101,16 @@ function getNextRunAt(schedules: InspectionTask["schedules"], from = new Date())
       const start = parseClock(schedule.startTime);
       const end = parseClock(schedule.endTime);
       const intervalMinutes = schedule.intervalMinutes ?? 30;
+      const endCandidate = createShanghaiDate(parts.year, parts.month, parts.day, end.hour, end.minute);
+      let candidate = createShanghaiDate(parts.year, parts.month, parts.day, start.hour, start.minute);
 
-      let candidateMinutes = start.totalMinutes;
-      if (dayOffset === 0 && currentMinutes > start.totalMinutes) {
-        const elapsed = currentMinutes - start.totalMinutes;
-        candidateMinutes = start.totalMinutes + Math.ceil(elapsed / intervalMinutes) * intervalMinutes;
+      while (candidate < from && candidate <= endCandidate) {
+        candidate = new Date(candidate.getTime() + intervalMinutes * 60 * 1000);
       }
 
-      if (candidateMinutes > end.totalMinutes) continue;
+      if (candidate > endCandidate) continue;
 
-      const candidateHour = Math.floor(candidateMinutes / 60);
-      const candidateMinute = candidateMinutes % 60;
-      const candidate = createShanghaiDate(parts.year, parts.month, parts.day, candidateHour, candidateMinute);
-      if (candidate >= from && (!next || candidate < next)) {
+      if ((!next || candidate < next) && candidate >= from) {
         next = candidate;
       }
     }
@@ -311,7 +325,7 @@ export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
     algorithmIds: merged.algorithmIds,
     algorithmVersions: merged.algorithmVersions,
     devices: dedupeDevices(merged.devices),
-    schedules: merged.schedules,
+    schedules: dedupeSchedules(merged.schedules),
     inspectionRule: merged.inspectionRule,
     messageRule: merged.messageRule,
     regionsByQrCode: merged.regionsByQrCode,

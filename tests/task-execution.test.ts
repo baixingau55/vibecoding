@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { executeTask, upsertTask } from "@/lib/domain/tasks";
 import { getServiceBalance } from "@/lib/domain/service-balance";
@@ -7,6 +7,7 @@ import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 describe("task execution", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     getMemoryStore().replace(createMockSnapshot());
   });
 
@@ -39,5 +40,23 @@ describe("task execution", () => {
 
   it("rejects execution when task configuration is invalid", async () => {
     await expect(executeTask("task_smoking")).rejects.toThrow();
+  });
+
+  it("keeps 1-minute time range tasks on the current day after save", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-13T09:43:18.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "1-minute schedule",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [{ type: "time_range", startTime: "17:42", endTime: "18:00", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 1 }],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    expect(task.nextRunAt).toBe("2026-03-13T09:44:00.000Z");
   });
 });
