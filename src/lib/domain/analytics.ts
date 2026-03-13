@@ -85,19 +85,19 @@ function buildRankedTasks(snapshot: Awaited<ReturnType<typeof getAppSnapshot>>, 
 }
 
 export async function getInspectionOverview(): Promise<InspectionOverview> {
-  return buildInspectionOverview(await getAppSnapshot());
+  return buildInspectionOverview(await getAppSnapshot({ includeDevices: false }));
 }
 
 export async function getTrendPoints(): Promise<TrendPoint[]> {
-  return buildTrendPoints(await getAppSnapshot());
+  return buildTrendPoints(await getAppSnapshot({ includeDevices: false }));
 }
 
 export async function getRankedTasks(metric: RankingMetric): Promise<RankedTask[]> {
-  return buildRankedTasks(await getAppSnapshot(), metric);
+  return buildRankedTasks(await getAppSnapshot({ includeDevices: false }), metric);
 }
 
 export async function getAnalyticsPayload() {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return {
     overview: buildInspectionOverview(snapshot),
     trends: buildTrendPoints(snapshot),

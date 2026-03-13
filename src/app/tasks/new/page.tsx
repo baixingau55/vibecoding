@@ -7,7 +7,7 @@ export default async function TaskCreatePage({
 }: {
   searchParams: Promise<{ algorithmId?: string }>;
 }) {
-  const [{ algorithmId }, algorithms, snapshot] = await Promise.all([searchParams, getAlgorithms(), getAppSnapshot()]);
+  const [{ algorithmId }, algorithms, snapshot] = await Promise.all([searchParams, getAlgorithms(), getAppSnapshot({ includeDevices: true })]);
 
   return <TaskBuilder algorithms={algorithms} devices={snapshot.devices} selectedAlgorithmId={algorithmId} />;
 }

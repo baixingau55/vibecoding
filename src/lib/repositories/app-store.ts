@@ -124,7 +124,33 @@ async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   return Array.from(merged.values());
 }
 
-async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
+function buildKnownDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
+  const merged = new Map<string, DeviceRef>();
+
+  for (const device of taskDevices) {
+    merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
+  }
+
+  for (const qrCode of resultQrCodes) {
+    const hasQrCode = Array.from(merged.values()).some((device) => device.qrCode === qrCode);
+    if (!hasQrCode) {
+      merged.set(`result:${qrCode}:1`, {
+        qrCode,
+        channelId: 1,
+        name: qrCode,
+        status: "online",
+        groupName: "鍘嗗彶鎶撴媿璁惧",
+        previewImage: FALLBACK_DEVICE_PREVIEW,
+        profileId: undefined,
+        profileName: undefined
+      });
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot | null> {
   const client = getSupabaseAdminClient();
   if (!client) return null;
   if (!(await hasSupabaseSchema())) return null;
@@ -236,7 +262,8 @@ async function getSupabaseSnapshot(): Promise<AppSnapshot | null> {
 
   const tasks = Array.from(tasksById.values());
   const resultQrCodes = Array.from(new Set((resultRes.data ?? []).map((row) => row.qr_code).filter(Boolean)));
-  const devices = await loadDevices(tasks.flatMap((task) => task.devices), resultQrCodes);
+  const knownTaskDevices = tasks.flatMap((task) => task.devices);
+  const devices = includeDevices ? await loadDevices(knownTaskDevices, resultQrCodes) : buildKnownDevices(knownTaskDevices, resultQrCodes);
   const deviceByCompositeKey = new Map<string, DeviceRef>(
     devices.map((device) => [`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device] as const)
   );
@@ -411,10 +438,10 @@ export async function getAppStore() {
   await ensureBaseRows();
 
   return {
-    async snapshot() {
-      const snapshot = await getSupabaseSnapshot();
+    async snapshot(includeDevices = true) {
+      const snapshot = await getSupabaseSnapshot(includeDevices);
       if (!snapshot) {
-        return getFallbackStore().snapshot();
+        return getFallbackStore().snapshot(includeDevices);
       }
       return snapshot;
     },

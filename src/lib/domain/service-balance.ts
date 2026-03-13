@@ -5,18 +5,18 @@ import { getAppSnapshot } from "@/lib/domain/store";
 import type { PurchaseRecord, ServiceBalance } from "@/lib/types";
 
 export async function getServiceBalance() {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return snapshot.serviceBalance;
 }
 
 export async function getPurchaseHistory() {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return snapshot.purchaseRecords;
 }
 
 export async function purchaseServiceUnits(input: { amount: number; accountName?: string; note?: string }) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     total: snapshot.serviceBalance.total + input.amount,
@@ -49,7 +49,7 @@ export async function purchaseServiceUnits(input: { amount: number; accountName?
 
 export async function chargeUnits(taskId: string, amount: number) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     remaining: Math.max(snapshot.serviceBalance.remaining - amount, 0),
@@ -63,7 +63,7 @@ export async function chargeUnits(taskId: string, amount: number) {
 
 export async function refundUnits(taskId: string, amount: number) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const nextBalance: ServiceBalance = {
     ...snapshot.serviceBalance,
     remaining: snapshot.serviceBalance.remaining + amount,

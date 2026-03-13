@@ -30,7 +30,7 @@ export function getMemoryStore() {
   const store = global.__AI_XUNJIAN_STORE__;
 
   return {
-    snapshot() {
+    snapshot(_includeDevices = true) {
       return clone(store);
     },
     replace(snapshot: AppSnapshot) {

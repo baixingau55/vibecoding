@@ -267,7 +267,7 @@ function buildProfileSupportFailures(task: InspectionTask, runId: string, profil
 }
 
 export async function listTasks() {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
@@ -315,7 +315,7 @@ export async function triggerDueTasks(now = new Date()) {
 }
 
 export async function getTaskById(id: string) {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   const task = snapshot.tasks.find((item) => item.id === id) ?? null;
   if (!task) return null;
 
@@ -330,7 +330,7 @@ export async function getTaskById(id: string) {
 
 export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const now = new Date().toISOString();
   const previous = input.id ? snapshot.tasks.find((item) => item.id === input.id) ?? null : null;
   const merged = mergeTaskInput(previous, input);
@@ -375,7 +375,7 @@ export async function closeTask(id: string) {
 
 export async function deleteTask(id: string) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const task = snapshot.tasks.find((item) => item.id === id);
   if (!task) return null;
 
@@ -688,7 +688,7 @@ export async function handleTpLinkTaskCallback(payload: {
     error_code?: number;
   }>;
 }) {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   const run = snapshot.runs.find((item) => item.tpLinkTaskId === payload.taskId);
   if (!run) {
     return { ok: false, reason: "Run not found for TP-LINK taskId." };

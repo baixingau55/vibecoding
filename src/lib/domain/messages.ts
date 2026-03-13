@@ -39,18 +39,18 @@ function normalizeList(payload: Record<string, unknown>) {
 }
 
 export async function getMessages() {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return snapshot.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getMessageById(id: string) {
-  const snapshot = await getAppSnapshot();
+  const snapshot = await getAppSnapshot({ includeDevices: false });
   return snapshot.messages.find((item) => item.id === id) ?? null;
 }
 
 export async function markMessageRead(id: string) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const message = snapshot.messages.find((item) => item.id === id);
   if (!message) {
     return null;
@@ -62,7 +62,7 @@ export async function markMessageRead(id: string) {
 
 export async function handleTpLinkMessageCallback(payload: unknown) {
   const store = await getAppStore();
-  const snapshot = await store.snapshot();
+  const snapshot = await store.snapshot(false);
   const items = normalizeList((payload ?? {}) as Record<string, unknown>);
   const nextMessages: MessageItem[] = [];
   const nextMedia: MediaAsset[] = [];

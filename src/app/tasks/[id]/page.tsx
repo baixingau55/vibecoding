@@ -8,7 +8,7 @@ import { getTaskById } from "@/lib/domain/tasks";
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [detail, algorithms, snapshot] = await Promise.all([getTaskById(id), getAlgorithms(), getAppSnapshot()]);
+  const [detail, algorithms, snapshot] = await Promise.all([getTaskById(id), getAlgorithms(), getAppSnapshot({ includeDevices: true })]);
 
   if (!detail) {
     notFound();

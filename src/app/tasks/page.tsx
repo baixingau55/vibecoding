@@ -10,7 +10,7 @@ export default async function TasksPage() {
     getPurchaseHistory(),
     getAlgorithms(),
     listTasks(),
-    getAppSnapshot()
+    getAppSnapshot({ includeDevices: false })
   ]);
 
   const previewByTaskId = Object.fromEntries(
