@@ -19,8 +19,16 @@ async function handleCron(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const summary = await triggerDueTasks();
-  return NextResponse.json(summary);
+  try {
+    const summary = await triggerDueTasks();
+    return NextResponse.json(summary);
+  } catch (error) {
+    console.error("Failed to run scheduled tasks", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to run scheduled tasks" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET(request: NextRequest) {

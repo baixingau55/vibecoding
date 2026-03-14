@@ -326,7 +326,11 @@ export async function triggerDueTasks(now = new Date()) {
       failedCount: summary.failed.length,
       errorSummary: summary.failed.map((item) => `${item.taskId}: ${item.error}`).join(" | ") || undefined
     };
-    await store.addSchedulerScan(scan);
+    try {
+      await store.addSchedulerScan(scan);
+    } catch (error) {
+      console.error("Failed to persist scheduler scan", error);
+    }
   }
 
   return summary;
@@ -922,9 +926,12 @@ export async function handleTpLinkTaskCallback(payload: {
   }
   await store.updateRun(finalRun);
 
-  const hasOtherRunningRuns = snapshot.runs.some(
-    (item) => item.taskId === task.id && item.id !== run.id && item.status === "running"
-  );
+  const latestRuns =
+    "getTaskRunsData" in store && typeof store.getTaskRunsData === "function"
+      ? await store.getTaskRunsData(task.id)
+      : (await store.snapshot(false)).runs.filter((item) => item.taskId === task.id);
+
+  const hasOtherRunningRuns = latestRuns.some((item) => item.id !== run.id && item.status === "running");
 
   await store.upsertTask({
     ...task,
