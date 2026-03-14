@@ -6,6 +6,7 @@ import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
 import {
   bootstrapTpLinkMessageSubscription,
+  fetchTpLinkDevices,
   fetchTpLinkDeviceByQrCode,
   getTpLinkInspectionTaskResult,
   setTpLinkAlgorithmVersions,
@@ -208,10 +209,54 @@ function dedupeDevices(devices: InspectionTask["devices"]) {
   );
 }
 
+function isPlaceholderDeviceIdentity(device: InspectionTask["devices"][number]) {
+  const normalizedName = device.name?.trim();
+  const normalizedGroup = device.groupName?.trim() ?? "";
+  return !normalizedName || normalizedName === device.qrCode || /托管设备|Entrust/i.test(normalizedGroup);
+}
+
+function scoreDeviceCandidate(
+  source: InspectionTask["devices"][number],
+  candidate: InspectionTask["devices"][number]
+) {
+  let score = 0;
+
+  if (source.profileId && source.profileId === candidate.profileId) score += 200;
+  if (source.mac && candidate.mac && source.mac === candidate.mac) score += 120;
+
+  const placeholderIdentity = isPlaceholderDeviceIdentity(source);
+
+  if (!placeholderIdentity && source.name && source.name === candidate.name) score += 80;
+  if (!placeholderIdentity && source.groupName && source.groupName === candidate.groupName) score += 60;
+  if (candidate.status === "online") score += 40;
+  if (candidate.profileId) score += 20;
+
+  return score;
+}
+
+function pickBestDeviceCandidate(
+  source: InspectionTask["devices"][number],
+  candidates: InspectionTask["devices"]
+) {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  return [...candidates].sort((left, right) => scoreDeviceCandidate(source, right) - scoreDeviceCandidate(source, left))[0];
+}
+
 async function resolveTaskDevicesForExecution(task: InspectionTask) {
+  const allDevices = await fetchTpLinkDevices().catch(() => []);
+
   return Promise.all(
     task.devices.map(async (device) => {
       if (device.profileId) return device;
+
+      const candidates = allDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
+      const bestCandidate = pickBestDeviceCandidate(device, candidates);
+      if (bestCandidate) {
+        return { ...device, ...bestCandidate };
+      }
+
       const fetched = await fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null);
       return fetched ? { ...device, ...fetched } : device;
     })
