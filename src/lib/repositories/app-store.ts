@@ -41,13 +41,25 @@ let schemaReadyPromise: Promise<boolean> | null = null;
 let baseRowsEnsuredAt = 0;
 let baseRowsPromise: Promise<boolean> | null = null;
 
+function getErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") return undefined;
+  return "code" in error && typeof error.code === "string" ? error.code : undefined;
+}
+
+function getErrorMessage(error: unknown) {
+  if (!error || typeof error !== "object") return "";
+  return "message" in error && typeof error.message === "string" ? error.message : "";
+}
+
 function isMissingTableError(error: unknown) {
-  return error instanceof PostgrestError && error.code === "PGRST205";
+  const code = getErrorCode(error);
+  return code === "PGRST205";
 }
 
 function isMissingColumnError(error: unknown) {
-  if (!(error instanceof PostgrestError)) return false;
-  return error.code === "PGRST204" || error.code === "42703" || /column/i.test(error.message);
+  const code = getErrorCode(error);
+  const message = getErrorMessage(error);
+  return code === "PGRST204" || code === "42703" || /column/i.test(message);
 }
 
 function toDateString(value: string | null | undefined) {
