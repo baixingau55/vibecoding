@@ -36,6 +36,7 @@ const DUE_TASK_GRACE_MS = 5 * 1000;
 const MIN_STALE_RUNNING_RUN_MS = 3 * 60 * 1000;
 const MAX_STALE_RUNNING_RUN_MS = 15 * 60 * 1000;
 const STALE_TIME_POINT_RUN_MS = 30 * 60 * 1000;
+const MAX_CATCH_UP_EXECUTIONS_PER_SCAN = 15;
 
 function calculateTaskStatus(task: Pick<InspectionTask, "devices">): InspectionTask["status"] {
   if (task.devices.length === 0) return "config_error";
@@ -437,6 +438,16 @@ export async function listTasks() {
   return getCachedTaskList();
 }
 
+async function getFreshTaskSummary(taskId: string) {
+  const store = await getAppStore();
+  if ("getTaskSummaryData" in store && typeof store.getTaskSummaryData === "function") {
+    return store.getTaskSummaryData(taskId);
+  }
+
+  const snapshot = await store.snapshot(false);
+  return snapshot.tasks.find((item) => item.id === taskId) ?? null;
+}
+
 export async function triggerDueTasks(now = new Date()) {
   const tasks = await listTasks();
   const reconciledTasks = await Promise.all(tasks.map((task) => reconcileRunningTaskState(task, now)));
@@ -451,8 +462,24 @@ export async function triggerDueTasks(now = new Date()) {
   const failed: Array<{ taskId: string; error: string }> = [];
   for (const task of dueTasks) {
     try {
-      await executeTask(task.id);
-      completed.push(task.id);
+      let currentTask: InspectionTask | null = task;
+      let executionCount = 0;
+
+      while (
+        currentTask &&
+        ["enabled", "running"].includes(currentTask.status) &&
+        currentTask.nextRunAt &&
+        new Date(currentTask.nextRunAt).getTime() - DUE_TASK_GRACE_MS <= now.getTime() &&
+        executionCount < MAX_CATCH_UP_EXECUTIONS_PER_SCAN
+      ) {
+        await executeTask(currentTask.id);
+        executionCount += 1;
+        currentTask = await getFreshTaskSummary(task.id);
+      }
+
+      if (executionCount > 0) {
+        completed.push(task.id);
+      }
     } catch (error) {
       failed.push({
         taskId: task.id,
@@ -852,10 +879,9 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
 }
 
 export async function executeTask(taskId: string) {
-  const details = await getTaskById(taskId);
-  if (!details) throw new Error("Task not found.");
+  const task = await getFreshTaskSummary(taskId);
+  if (!task) throw new Error("Task not found.");
 
-  const { task } = details;
   if (task.status === "config_error") {
     throw new Error(task.configErrorReason ?? "Task configuration is invalid.");
   }
