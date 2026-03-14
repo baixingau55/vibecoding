@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
-import { deleteTask, getTaskSummary, upsertTask } from "@/lib/domain/tasks";
+import { deleteTask, getTaskRuntimeSummary, queueImmediateExecutionIfDue, upsertTask } from "@/lib/domain/tasks";
 import type { InspectionTask } from "@/lib/types";
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
-  const task = await getTaskSummary(params.id);
-  if (!task) {
+  const summary = await getTaskRuntimeSummary(params.id);
+  if (!summary) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
-  return NextResponse.json(task);
+  return NextResponse.json(summary);
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -26,6 +26,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     inspectionRule: body.inspectionRule,
     messageRule: body.messageRule,
     regionsByQrCode: body.regionsByQrCode
+  });
+
+  after(async () => {
+    try {
+      await queueImmediateExecutionIfDue(task);
+    } catch (error) {
+      console.error(`Failed to queue immediate execution for task ${task.id}`, error);
+    }
   });
 
   return NextResponse.json({ task });

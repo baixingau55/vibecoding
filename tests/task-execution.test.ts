@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { executeTask, triggerDueTasks, upsertTask } from "@/lib/domain/tasks";
+import { executeTask, queueImmediateExecutionIfDue, triggerDueTasks, upsertTask } from "@/lib/domain/tasks";
 import { getServiceBalance } from "@/lib/domain/service-balance";
 import { createMockSnapshot } from "@/lib/mock-data";
 import { getMemoryStore } from "@/lib/repositories/memory-store";
@@ -81,6 +81,31 @@ describe("task execution", () => {
     expect(task.nextRunAt).toBe("2026-03-13T08:05:00.000Z");
   });
 
+  it("executes immediately when a task is saved inside an active time range and keeps the original grid", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-13T10:03:20.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "immediate range task",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [{ type: "time_range", startTime: "18:00", endTime: "19:00", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 5 }],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    const queueResult = await queueImmediateExecutionIfDue(task);
+    const currentSnapshot = await getMemoryStore().snapshot(false);
+    const updatedTask = currentSnapshot.tasks.find((item) => item.id === task.id)!;
+    const relatedRuns = currentSnapshot.runs.filter((item) => item.taskId === task.id);
+
+    expect(queueResult.queued).toBe(true);
+    expect(relatedRuns).toHaveLength(1);
+    expect(updatedTask.nextRunAt).toBe("2026-03-13T10:05:00.000Z");
+  });
+
   it("continues scanning running tasks for later time range intervals", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-13T09:43:18.000Z"));
@@ -136,5 +161,49 @@ describe("task execution", () => {
     expect(summary.completed).toContain(task.id);
     expect(updatedTask.status).toBe("enabled");
     expect(updatedTask.nextRunAt).toBeTruthy();
+  });
+
+  it("reconciles stale running minute-range runs before the next interval fires", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-14T09:05:10.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "stale minute run task",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [{ type: "time_range", startTime: "17:00", endTime: "19:00", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 1 }],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    const store = getMemoryStore();
+    const currentSnapshot = await store.snapshot(false);
+    const patchedTask = currentSnapshot.tasks.find((item) => item.id === task.id)!;
+    patchedTask.status = "running";
+    patchedTask.nextRunAt = "2026-03-14T09:05:00.000Z";
+    currentSnapshot.runs.unshift({
+      id: "run_stale_range",
+      taskId: task.id,
+      startedAt: "2026-03-14T09:01:00.000Z",
+      status: "running",
+      totalChecks: 1,
+      successfulChecks: 0,
+      failedChecks: 0,
+      chargedUnits: 1,
+      refundedUnits: 0
+    });
+    store.replace(currentSnapshot);
+
+    const summary = await triggerDueTasks(new Date("2026-03-14T09:05:10.000Z"));
+    const after = await store.snapshot(false);
+    const staleRun = after.runs.find((item) => item.id === "run_stale_range")!;
+    const latestTask = after.tasks.find((item) => item.id === task.id)!;
+
+    expect(summary.completed).toContain(task.id);
+    expect(staleRun.status).toBe("failed");
+    expect(staleRun.refundedUnits).toBeGreaterThanOrEqual(1);
+    expect(latestTask.nextRunAt).toBeTruthy();
   });
 });

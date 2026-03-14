@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
-import { listTasks, upsertTask } from "@/lib/domain/tasks";
+import { listTasks, queueImmediateExecutionIfDue, upsertTask } from "@/lib/domain/tasks";
 import type { InspectionTask } from "@/lib/types";
 
 export async function GET() {
@@ -19,6 +19,14 @@ export async function POST(request: NextRequest) {
     inspectionRule: body.inspectionRule,
     messageRule: body.messageRule,
     regionsByQrCode: body.regionsByQrCode
+  });
+
+  after(async () => {
+    try {
+      await queueImmediateExecutionIfDue(task);
+    } catch (error) {
+      console.error(`Failed to queue immediate execution for task ${task.id}`, error);
+    }
   });
 
   return NextResponse.json({ task });

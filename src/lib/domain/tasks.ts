@@ -33,7 +33,9 @@ type TaskInput = Pick<
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DUE_TASK_GRACE_MS = 5 * 1000;
-const STALE_RUNNING_RUN_MS = 2 * 60 * 60 * 1000;
+const MIN_STALE_RUNNING_RUN_MS = 3 * 60 * 1000;
+const MAX_STALE_RUNNING_RUN_MS = 15 * 60 * 1000;
+const STALE_TIME_POINT_RUN_MS = 30 * 60 * 1000;
 
 function calculateTaskStatus(task: Pick<InspectionTask, "devices">): InspectionTask["status"] {
   if (task.devices.length === 0) return "config_error";
@@ -76,6 +78,37 @@ function dedupeSchedules(schedules: InspectionTask["schedules"]) {
       ] as const)
     ).values()
   );
+}
+
+function isScheduleActiveNow(schedule: InspectionTask["schedules"][number], at = new Date()) {
+  const parts = getShanghaiParts(at);
+  if (!schedule.repeatDays.includes(parts.weekDay)) return false;
+  if (schedule.type !== "time_range" || !schedule.endTime) return false;
+
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const start = parseClock(schedule.startTime).totalMinutes;
+  const end = parseClock(schedule.endTime).totalMinutes;
+  return currentMinutes >= start && currentMinutes <= end;
+}
+
+function shouldImmediatelyExecuteTask(task: InspectionTask, at = new Date()) {
+  if (task.status !== "enabled") return false;
+  return task.schedules.some((schedule) => isScheduleActiveNow(schedule, at));
+}
+
+function getSmallestIntervalMinutes(task: InspectionTask) {
+  const intervals = task.schedules
+    .filter((schedule) => schedule.type === "time_range")
+    .map((schedule) => schedule.intervalMinutes ?? 30);
+
+  if (intervals.length === 0) return null;
+  return Math.min(...intervals);
+}
+
+function getStaleRunningRunMs(task: InspectionTask) {
+  const smallestInterval = getSmallestIntervalMinutes(task);
+  if (smallestInterval === null) return STALE_TIME_POINT_RUN_MS;
+  return Math.min(MAX_STALE_RUNNING_RUN_MS, Math.max(MIN_STALE_RUNNING_RUN_MS, smallestInterval * 2 * 60 * 1000));
 }
 
 function getNextRunAt(schedules: InspectionTask["schedules"], from = new Date()) {
@@ -217,12 +250,14 @@ function isPlaceholderDeviceIdentity(device: InspectionTask["devices"][number]) 
 
 function scoreDeviceCandidate(
   source: InspectionTask["devices"][number],
-  candidate: InspectionTask["devices"][number]
+  candidate: InspectionTask["devices"][number],
+  preferredProfileId?: string
 ) {
   let score = 0;
 
   if (source.profileId && source.profileId === candidate.profileId) score += 200;
   if (source.mac && candidate.mac && source.mac === candidate.mac) score += 120;
+  if (!source.profileId && preferredProfileId && candidate.profileId === preferredProfileId) score += 110;
 
   const placeholderIdentity = isPlaceholderDeviceIdentity(source);
 
@@ -236,23 +271,33 @@ function scoreDeviceCandidate(
 
 function pickBestDeviceCandidate(
   source: InspectionTask["devices"][number],
-  candidates: InspectionTask["devices"]
+  candidates: InspectionTask["devices"],
+  preferredProfileId?: string
 ) {
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
 
-  return [...candidates].sort((left, right) => scoreDeviceCandidate(source, right) - scoreDeviceCandidate(source, left))[0];
+  return [...candidates].sort(
+    (left, right) => scoreDeviceCandidate(source, right, preferredProfileId) - scoreDeviceCandidate(source, left, preferredProfileId)
+  )[0];
 }
 
 async function resolveTaskDevicesForExecution(task: InspectionTask) {
   const allDevices = await fetchTpLinkDevices().catch(() => []);
+  const knownProfileCounts = new Map<string, number>();
+  for (const device of task.devices) {
+    if (!device.profileId) continue;
+    knownProfileCounts.set(device.profileId, (knownProfileCounts.get(device.profileId) ?? 0) + 1);
+  }
+  const preferredProfileId =
+    [...knownProfileCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? undefined;
 
   return Promise.all(
     task.devices.map(async (device) => {
       if (device.profileId) return device;
 
       const candidates = allDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
-      const bestCandidate = pickBestDeviceCandidate(device, candidates);
+      const bestCandidate = pickBestDeviceCandidate(device, candidates, preferredProfileId);
       if (bestCandidate) {
         return { ...device, ...bestCandidate };
       }
@@ -284,15 +329,20 @@ async function reconcileRunningTaskState(task: InspectionTask, now = new Date())
     return nextTask;
   }
 
-  const staleRunningRuns = runningRuns.filter((run) => now.getTime() - new Date(run.startedAt).getTime() >= STALE_RUNNING_RUN_MS);
+  const staleRunningRuns = runningRuns.filter((run) => now.getTime() - new Date(run.startedAt).getTime() >= getStaleRunningRunMs(task));
   if (staleRunningRuns.length === 0) return task;
 
   for (const run of staleRunningRuns) {
+    const pendingUnits = Math.max(0, run.chargedUnits - run.refundedUnits - run.successfulChecks - run.failedChecks);
+    if (pendingUnits > 0) {
+      await refundUnits(task.id, pendingUnits);
+    }
     await store.updateRun({
       ...run,
       completedAt: now.toISOString(),
       status: "failed",
-      failedChecks: Math.max(run.failedChecks, run.totalChecks || run.chargedUnits || 1)
+      failedChecks: Math.max(run.failedChecks, run.totalChecks || run.chargedUnits || 1),
+      refundedUnits: run.refundedUnits + pendingUnits
     });
   }
 
@@ -501,6 +551,35 @@ export async function getTaskSummary(id: string) {
   return getCachedTaskSummary(id);
 }
 
+export async function getTaskRuntimeSummary(id: string) {
+  const store = await getAppStore();
+  const task =
+    "getTaskSummaryData" in store && typeof store.getTaskSummaryData === "function"
+      ? await store.getTaskSummaryData(id)
+      : (await getTaskSummary(id));
+
+  if (!task) return null;
+
+  const reconciledTask = await reconcileRunningTaskState(task, new Date());
+  const runs =
+    "getTaskRunsData" in store && typeof store.getTaskRunsData === "function"
+      ? await store.getTaskRunsData(id)
+      : (await getTaskRuns(id));
+  const latestRun = runs[0] ?? null;
+  const staleThresholdMs = getStaleRunningRunMs(reconciledTask);
+  const hasStaleRunningRun = runs.some(
+    (run) => run.status === "running" && Date.now() - new Date(run.startedAt).getTime() >= staleThresholdMs
+  );
+
+  return {
+    task: reconciledTask,
+    latestRunStatus: latestRun?.status,
+    latestRunStartedAt: latestRun?.startedAt,
+    latestRunCompletedAt: latestRun?.completedAt,
+    hasStaleRunningRun
+  };
+}
+
 const getCachedTaskRuns = unstable_cache(
   async (id: string) => {
     const store = await getAppStore();
@@ -605,6 +684,30 @@ export async function upsertTask(input: Partial<TaskInput> & { id?: string }) {
   await store.upsertTask(task);
   revalidateTaskReadModels();
   return task;
+}
+
+export async function queueImmediateExecutionIfDue(task: InspectionTask) {
+  const now = new Date();
+  if (!shouldImmediatelyExecuteTask(task, now)) {
+    return { queued: false, reason: "Task is not currently inside an active time range." } as const;
+  }
+
+  const store = await getAppStore();
+  const runs =
+    "getTaskRunsData" in store && typeof store.getTaskRunsData === "function"
+      ? await store.getTaskRunsData(task.id)
+      : (await getTaskRuns(task.id));
+  const staleThresholdMs = getStaleRunningRunMs(task);
+  const hasFreshRunningRun = runs.some(
+    (run) => run.status === "running" && now.getTime() - new Date(run.startedAt).getTime() < staleThresholdMs
+  );
+
+  if (hasFreshRunningRun) {
+    return { queued: false, reason: "Task already has an active fresh run." } as const;
+  }
+
+  await executeTask(task.id);
+  return { queued: true } as const;
 }
 
 export async function closeTask(id: string) {
