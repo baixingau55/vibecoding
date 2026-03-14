@@ -25,11 +25,22 @@ function createModuleState<T>(initial: T): ModuleState<T> {
 
 async function fetchJson<T>(url: string) {
   const response = await fetch(url, { cache: "no-store" });
-  const payload = (await response.json()) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error ?? "Request failed");
+  const rawBody = await response.text();
+
+  let payload: (T & { error?: string }) | null = null;
+  if (rawBody.trim()) {
+    try {
+      payload = JSON.parse(rawBody) as T & { error?: string };
+    } catch {
+      throw new Error(rawBody.slice(0, 200) || "Request failed");
+    }
   }
-  return payload;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? (rawBody.slice(0, 200) || "Request failed"));
+  }
+
+  return payload as T;
 }
 
 export function TaskDetailPageClient({ taskId }: { taskId: string }) {
@@ -99,7 +110,10 @@ export function TaskDetailPageClient({ taskId }: { taskId: string }) {
 
   async function loadEditData(): Promise<EditPayload> {
     const payload = await fetchJson<EditPayload>(`/api/tasks/${taskId}/edit-data`);
-    return payload;
+    return {
+      algorithms: payload.algorithms ?? [],
+      devices: payload.devices ?? []
+    };
   }
 
   if (summary.loading) {

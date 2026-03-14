@@ -2,14 +2,37 @@
 
 import { useEffect, useState } from "react";
 
-import { TaskBuilder } from "@/components/tasks/task-builder";
 import { TaskDetailSkeleton } from "@/components/loading/page-skeletons";
+import { TaskBuilder } from "@/components/tasks/task-builder";
 import type { Algorithm, DeviceRef } from "@/lib/types";
 
 type CreatePayload = {
   algorithms: Algorithm[];
   devices: DeviceRef[];
 };
+
+async function fetchCreatePayload() {
+  const response = await fetch("/api/tasks/create-data", { cache: "no-store" });
+  const rawBody = await response.text();
+
+  let payload: (CreatePayload & { error?: string }) | null = null;
+  if (rawBody.trim()) {
+    try {
+      payload = JSON.parse(rawBody) as CreatePayload & { error?: string };
+    } catch {
+      throw new Error(rawBody.slice(0, 200) || "创建任务数据加载失败");
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? (rawBody.slice(0, 200) || "创建任务数据加载失败"));
+  }
+
+  return {
+    algorithms: payload?.algorithms ?? [],
+    devices: payload?.devices ?? []
+  };
+}
 
 export function TaskCreatePageClient({ selectedAlgorithmId }: { selectedAlgorithmId?: string }) {
   const [payload, setPayload] = useState<CreatePayload | null>(null);
@@ -20,13 +43,9 @@ export function TaskCreatePageClient({ selectedAlgorithmId }: { selectedAlgorith
 
     (async () => {
       try {
-        const response = await fetch("/api/tasks/create-data", { cache: "no-store" });
-        const data = (await response.json()) as CreatePayload & { error?: string };
-        if (!response.ok) {
-          throw new Error(data.error ?? "创建任务数据加载失败");
-        }
+        const nextPayload = await fetchCreatePayload();
         if (!cancelled) {
-          setPayload({ algorithms: data.algorithms, devices: data.devices });
+          setPayload(nextPayload);
         }
       } catch (nextError) {
         if (!cancelled) {

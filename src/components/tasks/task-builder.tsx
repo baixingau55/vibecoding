@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PencilLine, Plus, Trash2, X } from "lucide-react";
 
@@ -82,7 +82,8 @@ export function TaskBuilder({
   selectedAlgorithmId,
   submitUrl = "/api/tasks",
   method = "POST",
-  redirectTo = "/tasks"
+  redirectTo = "/tasks",
+  devicesLoaderUrl = "/api/tasks/device-options"
 }: {
   algorithms: Algorithm[];
   devices: DeviceRef[];
@@ -91,6 +92,7 @@ export function TaskBuilder({
   submitUrl?: string;
   method?: "POST" | "PATCH";
   redirectTo?: string;
+  devicesLoaderUrl?: string;
 }) {
   const router = useRouter();
   const defaultAlgorithm = algorithms.find((item) => item.id === selectedAlgorithmId) ?? algorithms[0];
@@ -134,6 +136,9 @@ export function TaskBuilder({
   );
 
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [allDevices, setAllDevices] = useState<DeviceRef[]>(devices);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [devicesLoadError, setDevicesLoadError] = useState("");
   const [deviceSearch, setDeviceSearch] = useState("");
   const [regionModalOpen, setRegionModalOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -141,24 +146,52 @@ export function TaskBuilder({
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [selectedGroupName, setSelectedGroupName] = useState("全部分组");
 
+  useEffect(() => {
+    setAllDevices(devices);
+  }, [devices]);
+
   const activeDevice = useMemo(
     () => selectedDevices.find((item) => deviceKey(item) === activeDeviceCode) ?? null,
     [activeDeviceCode, selectedDevices]
   );
 
   const deviceGroups = useMemo(() => {
-    const groups = Array.from(new Set(devices.map((device) => device.groupName)));
+    const groups = Array.from(new Set(allDevices.map((device) => device.groupName)));
     return ["全部分组", ...groups];
-  }, [devices]);
+  }, [allDevices]);
 
   const availableDevices = useMemo(() => {
-    return devices.filter((device) => {
+    return allDevices.filter((device) => {
       if (selectedGroupName !== "全部分组" && device.groupName !== selectedGroupName) return false;
       if (!deviceSearch.trim()) return true;
       const keyword = deviceSearch.trim();
       return device.name.includes(keyword) || device.groupName.includes(keyword) || device.qrCode.includes(keyword);
     });
-  }, [deviceSearch, devices, selectedGroupName]);
+  }, [allDevices, deviceSearch, selectedGroupName]);
+
+  async function ensureDevicesLoaded() {
+    if (allDevices.length > 0 || devicesLoading) return;
+    setDevicesLoading(true);
+    setDevicesLoadError("");
+    try {
+      const response = await fetch(devicesLoaderUrl, { cache: "no-store" });
+      const text = await response.text();
+      const payload = (text.trim() ? JSON.parse(text) : {}) as { devices?: DeviceRef[]; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "加载设备列表失败");
+      }
+      setAllDevices(payload.devices ?? []);
+    } catch (error) {
+      setDevicesLoadError(error instanceof Error ? error.message : "加载设备列表失败");
+    } finally {
+      setDevicesLoading(false);
+    }
+  }
+
+  async function openDeviceModal() {
+    await ensureDevicesLoaded();
+    setDeviceModalOpen(true);
+  }
 
   function saveName() {
     const next = nameDraft.trim();
@@ -230,7 +263,7 @@ export function TaskBuilder({
   function applyDevices() {
     const nextDevices = Array.from(
       new Map(
-        devices
+        allDevices
           .filter((item) => pendingDeviceCodes.includes(deviceKey(item)))
           .map((item) => [deviceKey(item), item] as const)
       ).values()
@@ -485,7 +518,7 @@ export function TaskBuilder({
           <div className="ai-panel-head">
             <h2 className="ai-panel-title">巡检设备（{selectedDevices.length}）</h2>
             <div className="tplink-message-actions">
-              <button type="button" className="ai-button ai-button-light" onClick={() => setDeviceModalOpen(true)}>
+              <button type="button" className="ai-button ai-button-light" onClick={() => void openDeviceModal()}>
                 添加设备
               </button>
               <button
@@ -508,7 +541,7 @@ export function TaskBuilder({
               <div className="ai-device-empty">
                 <div className="ai-device-empty-icon" />
                 <p>请添加巡检设备</p>
-                <button type="button" className="ai-button ai-button-primary" onClick={() => setDeviceModalOpen(true)}>
+                <button type="button" className="ai-button ai-button-primary" onClick={() => void openDeviceModal()}>
                   添加设备
                 </button>
               </div>
@@ -696,7 +729,7 @@ export function TaskBuilder({
                 <div className="ai-device-groups">
                   {deviceGroups.map((groupName) => {
                     const count =
-                      groupName === "全部分组" ? devices.length : devices.filter((device) => device.groupName === groupName).length;
+                      groupName === "全部分组" ? allDevices.length : allDevices.filter((device) => device.groupName === groupName).length;
                     return (
                       <button
                         key={groupName}
@@ -718,31 +751,37 @@ export function TaskBuilder({
                     <span>所属分组</span>
                   </div>
                   <div className="ai-device-select-list">
-                    {availableDevices.map((device) => {
-                      const identity = deviceKey(device);
-                      const checked = pendingDeviceCodes.includes(identity);
-                      return (
-                        <label key={identity} className="ai-device-select-item">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) =>
-                              setPendingDeviceCodes((current) =>
-                                event.target.checked ? [...new Set([...current, identity])] : current.filter((item) => item !== identity)
-                              )
-                            }
-                          />
-                          <div className="ai-device-select-main">
-                            <strong>{device.name}</strong>
-                            <span className={device.status === "online" ? "ai-device-status ai-device-status-online" : "ai-device-status"}>
-                              {device.status === "online" ? "在线" : "离线"}
-                            </span>
-                            <p>{device.groupName}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
-                    {availableDevices.length === 0 ? <div className="ai-device-select-empty">暂无符合条件的设备</div> : null}
+                    {devicesLoading ? <div className="ai-device-select-empty">设备列表加载中...</div> : null}
+                    {!devicesLoading && devicesLoadError ? <div className="ai-device-select-empty">{devicesLoadError}</div> : null}
+                    {!devicesLoading && !devicesLoadError
+                      ? availableDevices.map((device) => {
+                          const identity = deviceKey(device);
+                          const checked = pendingDeviceCodes.includes(identity);
+                          return (
+                            <label key={identity} className="ai-device-select-item">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) =>
+                                  setPendingDeviceCodes((current) =>
+                                    event.target.checked ? [...new Set([...current, identity])] : current.filter((item) => item !== identity)
+                                  )
+                                }
+                              />
+                              <div className="ai-device-select-main">
+                                <strong>{device.name}</strong>
+                                <span className={device.status === "online" ? "ai-device-status ai-device-status-online" : "ai-device-status"}>
+                                  {device.status === "online" ? "在线" : "离线"}
+                                </span>
+                                <p>{device.groupName}</p>
+                              </div>
+                            </label>
+                          );
+                        })
+                      : null}
+                    {!devicesLoading && !devicesLoadError && availableDevices.length === 0 ? (
+                      <div className="ai-device-select-empty">暂无符合条件的设备</div>
+                    ) : null}
                   </div>
                 </div>
               </div>
