@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getAppSnapshot } from "@/lib/domain/store";
 import env from "@/lib/env";
+import { getSupabaseAdminClient } from "@/lib/supabase/client";
 
 function isAuthorized(request: NextRequest) {
   if (!env.internalAdminToken) return true;
@@ -19,11 +19,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const snapshot = await getAppSnapshot({ includeDevices: false });
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 200) : 50;
 
+  const client = getSupabaseAdminClient();
+  if (!client) {
+    return NextResponse.json({ scans: [] });
+  }
+
+  const { data, error } = await client
+    .from("scheduler_scans")
+    .select("*")
+    .order("scanned_at", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json({
-    scans: snapshot.schedulerScans.slice(0, safeLimit)
+    scans:
+      (data ?? []).map((row) => ({
+        id: row.id,
+        scannedAt: row.scanned_at,
+        dueCount: row.due_count,
+        completedCount: row.completed_count,
+        failedCount: row.failed_count,
+        errorSummary: row.error_summary ?? undefined
+      }))
   });
 }
