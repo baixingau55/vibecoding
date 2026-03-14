@@ -268,6 +268,17 @@ function buildProfileSupportFailures(task: InspectionTask, runId: string, profil
   );
 }
 
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    const serialized = JSON.stringify(error);
+    return serialized === undefined ? "Unknown execution error" : serialized;
+  } catch {
+    return "Unknown execution error";
+  }
+}
+
 const getCachedTaskList = unstable_cache(
   async () => {
     const store = await getAppStore();
@@ -304,7 +315,7 @@ export async function triggerDueTasks(now = new Date()) {
     } catch (error) {
       failed.push({
         taskId: task.id,
-        error: error instanceof Error ? error.message : "Unknown execution error"
+        error: toErrorMessage(error)
       });
     }
   }
