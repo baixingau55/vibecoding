@@ -1,13 +1,10 @@
-import { TaskBuilder } from "@/components/tasks/task-builder";
-import { getAlgorithms } from "@/lib/domain/algorithms";
-import { getAppSnapshot } from "@/lib/domain/store";
+import { TaskCreatePageClient } from "@/components/pages/task-create-page-client";
 
 export default async function TaskCreatePage({
   searchParams
 }: {
   searchParams: Promise<{ algorithmId?: string }>;
 }) {
-  const [{ algorithmId }, algorithms, snapshot] = await Promise.all([searchParams, getAlgorithms(), getAppSnapshot({ includeDevices: true })]);
-
-  return <TaskBuilder algorithms={algorithms} devices={snapshot.devices} selectedAlgorithmId={algorithmId} />;
+  const { algorithmId } = await searchParams;
+  return <TaskCreatePageClient selectedAlgorithmId={algorithmId} />;
 }

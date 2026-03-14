@@ -289,7 +289,10 @@ export async function listTasks() {
 export async function triggerDueTasks(now = new Date()) {
   const tasks = await listTasks();
   const dueTasks = tasks.filter(
-    (task) => task.status === "enabled" && task.nextRunAt && new Date(task.nextRunAt).getTime() - DUE_TASK_GRACE_MS <= now.getTime()
+    (task) =>
+      ["enabled", "running"].includes(task.status) &&
+      task.nextRunAt &&
+      new Date(task.nextRunAt).getTime() - DUE_TASK_GRACE_MS <= now.getTime()
   );
 
   const completed: string[] = [];

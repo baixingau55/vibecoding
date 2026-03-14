@@ -6,6 +6,11 @@ import { X } from "lucide-react";
 import type { MediaAsset, MessageItem } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
+const MESSAGE_TYPE_LABELS: Record<string, string> = {
+  all: "全部消息",
+  inspection_unqualified: "任务巡检不合格消息"
+};
+
 export function MessageCenter({
   initialMessages,
   mediaByMessage
@@ -19,6 +24,7 @@ export function MessageCenter({
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [confirmAllRead, setConfirmAllRead] = useState(false);
+  const [activeType, setActiveType] = useState<"all" | MessageItem["type"]>("all");
   const [filterState, setFilterState] = useState({ status: "all", day: "", hour: "", type: "all" });
   const [replayUrl, setReplayUrl] = useState("");
   const [replayError, setReplayError] = useState("");
@@ -28,6 +34,7 @@ export function MessageCenter({
 
   const filteredMessages = useMemo(() => {
     return messages.filter((item) => {
+      if (activeType !== "all" && item.type !== activeType) return false;
       if (query.trim() && !item.title.includes(query.trim()) && !item.algorithmId.includes(query.trim()) && !item.qrCode.includes(query.trim())) {
         return false;
       }
@@ -38,7 +45,7 @@ export function MessageCenter({
       if (filterState.hour && item.createdAt.slice(11, 13) !== filterState.hour.padStart(2, "0")) return false;
       return true;
     });
-  }, [filterState, messages, query]);
+  }, [activeType, filterState, messages, query]);
 
   const selectedMessage = filteredMessages.find((item) => item.id === selectedId) ?? messages.find((item) => item.id === selectedId) ?? null;
   const selectedIndex = filteredMessages.findIndex((item) => item.id === selectedId);
@@ -93,15 +100,26 @@ export function MessageCenter({
     <div className="ai-page ai-message-page">
       <section className="ai-panel ai-message-shell">
         <div className="ai-message-tabs">
-          <button type="button" className="ai-message-tab ai-message-tab-active">
-            消息中心
+          <button type="button" className={activeType === "all" ? "ai-message-tab ai-message-tab-active" : "ai-message-tab"} onClick={() => setActiveType("all")}>
+            {MESSAGE_TYPE_LABELS.all}
             <span className="ai-message-tab-badge">{messages.filter((item) => !item.read).length}</span>
           </button>
+          {messageTypes.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={activeType === type ? "ai-message-tab ai-message-tab-active" : "ai-message-tab"}
+              onClick={() => setActiveType(type)}
+            >
+              {MESSAGE_TYPE_LABELS[type] ?? type}
+              <span className="ai-message-tab-badge">{messages.filter((item) => item.type === type && !item.read).length}</span>
+            </button>
+          ))}
         </div>
 
         <div className="ai-message-toolbar">
           <div className="ai-toolbar-actions">
-            <button type="button" className="ai-button ai-button-light" disabled={checkedIds.length === 0} onClick={markCheckedAsRead}>
+            <button type="button" className="ai-button ai-button-light" disabled={checkedIds.length === 0} onClick={() => void markCheckedAsRead()}>
               标为已读
             </button>
             <button type="button" className="ai-button ai-button-light" onClick={() => setConfirmAllRead(true)}>
@@ -231,7 +249,7 @@ export function MessageCenter({
                   <option value="all">全部类型</option>
                   {messageTypes.map((type) => (
                     <option key={type} value={type}>
-                      {type}
+                      {MESSAGE_TYPE_LABELS[type] ?? type}
                     </option>
                   ))}
                 </select>
@@ -269,7 +287,7 @@ export function MessageCenter({
             <div className="ai-message-drawer-section">
               <dl className="ai-message-detail-grid">
                 <dt>消息类型</dt>
-                <dd>{selectedMessage.type}</dd>
+                <dd>{MESSAGE_TYPE_LABELS[selectedMessage.type] ?? selectedMessage.type}</dd>
                 <dt>消息内容</dt>
                 <dd>{selectedMessage.description}</dd>
                 <dt>消息推送时间</dt>
@@ -305,7 +323,9 @@ export function MessageCenter({
               ) : null}
 
               <div className="ai-replay-panel">
-                {replayUrl ? (
+                {replayLoading ? (
+                  <div className="ai-video-empty">正在拉取回放...</div>
+                ) : replayUrl ? (
                   <video className="ai-inline-video" src={replayUrl} controls playsInline preload="metadata" />
                 ) : (
                   <div className="ai-video-empty">{replayError || "当前暂无可预览回放，点击下方按钮尝试拉取。"}</div>
@@ -319,18 +339,18 @@ export function MessageCenter({
               >
                 {replayLoading ? "正在拉取回放..." : "查看回放"}
               </button>
-
             </div>
+
             <div className="ai-drawer-nav">
               <button type="button" disabled={selectedIndex <= 0} onClick={() => setSelectedId(filteredMessages[selectedIndex - 1]?.id ?? "")}>
-                &lt; 上一个
+                &lt; 上一条
               </button>
               <button
                 type="button"
                 disabled={selectedIndex === -1 || selectedIndex >= filteredMessages.length - 1}
                 onClick={() => setSelectedId(filteredMessages[selectedIndex + 1]?.id ?? "")}
               >
-                下一个 &gt;
+                下一条 &gt;
               </button>
             </div>
           </aside>
@@ -351,7 +371,7 @@ export function MessageCenter({
               <button type="button" className="ai-button ai-button-light" onClick={() => setConfirmAllRead(false)}>
                 取消
               </button>
-              <button type="button" className="ai-button ai-button-primary" onClick={markAllAsRead}>
+              <button type="button" className="ai-button ai-button-primary" onClick={() => void markAllAsRead()}>
                 确定
               </button>
             </div>
