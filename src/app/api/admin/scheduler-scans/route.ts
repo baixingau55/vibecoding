@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
     .limit(safeLimit);
 
   if (error) {
+    const missingTable =
+      error.message.includes("Could not find the table") ||
+      error.message.includes("schema cache");
+    if (missingTable) {
+      return NextResponse.json({ scans: [], warning: error.message });
+    }
+
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
