@@ -285,7 +285,15 @@ export function TaskBuilder({
       body: JSON.stringify(payload)
     });
 
-    const body = (await response.json()) as { error?: string; task?: { id: string } };
+    const rawBody = await response.text();
+    let body: { error?: string; task?: { id: string } } = {};
+    if (rawBody.trim()) {
+      try {
+        body = JSON.parse(rawBody) as { error?: string; task?: { id: string } };
+      } catch {
+        body = { error: rawBody.slice(0, 200) };
+      }
+    }
     setSaving(false);
 
     if (!response.ok) {
