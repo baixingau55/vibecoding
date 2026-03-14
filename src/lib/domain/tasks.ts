@@ -158,6 +158,43 @@ function getNextRunAt(schedules: InspectionTask["schedules"], from = new Date())
   return next?.toISOString();
 }
 
+function advanceNextRunAtFrom(schedules: InspectionTask["schedules"], anchor: string | Date | undefined, fallback = new Date()) {
+  if (anchor) {
+    const anchorDate = typeof anchor === "string" ? new Date(anchor) : anchor;
+    if (!Number.isNaN(anchorDate.getTime())) {
+      return getNextRunAt(schedules, new Date(anchorDate.getTime() + 1_000));
+    }
+  }
+
+  return getNextRunAt(schedules, new Date(fallback.getTime() + 1_000));
+}
+
+function computeNextRunAtAfterDispatch(
+  task: InspectionTask,
+  now: Date,
+  options?: { scheduledAt?: string; preserveScheduledGrid?: boolean }
+) {
+  const currentNextRun = task.nextRunAt ? new Date(task.nextRunAt) : null;
+
+  if (options?.preserveScheduledGrid && currentNextRun && currentNextRun.getTime() > now.getTime()) {
+    return task.nextRunAt;
+  }
+
+  if (options?.scheduledAt) {
+    return advanceNextRunAtFrom(task.schedules, options.scheduledAt, now);
+  }
+
+  if (currentNextRun && currentNextRun.getTime() - DUE_TASK_GRACE_MS <= now.getTime()) {
+    return advanceNextRunAtFrom(task.schedules, currentNextRun, now);
+  }
+
+  if (currentNextRun && currentNextRun.getTime() > now.getTime()) {
+    return task.nextRunAt;
+  }
+
+  return getNextRunAt(task.schedules, new Date(now.getTime() + 1_000));
+}
+
 function toRegionConfig(regions: RegionShape[]) {
   return JSON.stringify({
     region_info: regions.map((region) => ({
@@ -472,7 +509,7 @@ export async function triggerDueTasks(now = new Date()) {
         new Date(currentTask.nextRunAt).getTime() - DUE_TASK_GRACE_MS <= now.getTime() &&
         executionCount < MAX_CATCH_UP_EXECUTIONS_PER_SCAN
       ) {
-        await executeTask(currentTask.id);
+        await executeTask(currentTask.id, { scheduledAt: currentTask.nextRunAt });
         executionCount += 1;
         currentTask = await getFreshTaskSummary(task.id);
       }
@@ -733,7 +770,7 @@ export async function queueImmediateExecutionIfDue(task: InspectionTask) {
     return { queued: false, reason: "Task already has an active fresh run." } as const;
   }
 
-  await executeTask(task.id);
+  await executeTask(task.id, { preserveScheduledGrid: true });
   return { queued: true } as const;
 }
 
@@ -787,7 +824,7 @@ export async function bootstrapTpLinkSubscriptions() {
   return { ok: true, callbackUrl, signSecretApplied: normalizedSignSecret, result };
 }
 
-async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: number) {
+async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: number, nextRunAt: string | undefined) {
   await chargeUnits(task.id, chargeUnitsCount);
 
   const startedAt = new Date().toISOString();
@@ -867,7 +904,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
     ...task,
     status: "enabled",
     updatedAt: new Date().toISOString(),
-    nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
+    nextRunAt
   });
   revalidateTaskReadModels();
 
@@ -878,9 +915,11 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
   return { run, results, failures, messages };
 }
 
-export async function executeTask(taskId: string) {
+export async function executeTask(taskId: string, options?: { scheduledAt?: string; preserveScheduledGrid?: boolean }) {
   const task = await getFreshTaskSummary(taskId);
   if (!task) throw new Error("Task not found.");
+  const now = new Date();
+  const nextRunAtAfterDispatch = computeNextRunAtAfterDispatch(task, now, options);
 
   if (task.status === "config_error") {
     throw new Error(task.configErrorReason ?? "Task configuration is invalid.");
@@ -900,7 +939,8 @@ export async function executeTask(taskId: string) {
   if (process.env.VITEST || process.env.NODE_ENV === "test" || !env.tpLinkAk || !env.tpLinkSk) {
     return simulateTaskExecution(
       { ...task, devices: executableDevices.length > 0 ? executableDevices : resolvedDevices },
-      chargeUnitsCount
+      chargeUnitsCount,
+      nextRunAtAfterDispatch
     );
   }
 
@@ -1007,8 +1047,8 @@ export async function executeTask(taskId: string) {
       ...task,
       devices: resolvedDevices,
       status: executableGroups.length > 0 ? "running" : "enabled",
-      updatedAt: new Date().toISOString(),
-      nextRunAt: getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
+      updatedAt: now.toISOString(),
+      nextRunAt: nextRunAtAfterDispatch
     });
     revalidateTaskReadModels();
 
@@ -1168,7 +1208,10 @@ export async function handleTpLinkTaskCallback(payload: {
     ...task,
     status: hasOtherRunningRuns ? "running" : "enabled",
     updatedAt: new Date().toISOString(),
-    nextRunAt: hasOtherRunningRuns ? task.nextRunAt : getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
+    nextRunAt:
+      hasOtherRunningRuns || (task.nextRunAt && new Date(task.nextRunAt).getTime() > Date.now())
+        ? task.nextRunAt
+        : getNextRunAt(task.schedules, new Date(Date.now() + 1_000))
   });
   revalidateTaskReadModels();
 
