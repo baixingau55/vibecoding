@@ -32,6 +32,7 @@ type TaskInput = Pick<
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DUE_TASK_GRACE_MS = 5 * 1000;
+const STALE_RUNNING_RUN_MS = 2 * 60 * 60 * 1000;
 
 function calculateTaskStatus(task: Pick<InspectionTask, "devices">): InspectionTask["status"] {
   if (task.devices.length === 0) return "config_error";
@@ -217,6 +218,50 @@ async function resolveTaskDevicesForExecution(task: InspectionTask) {
   );
 }
 
+async function reconcileRunningTaskState(task: InspectionTask, now = new Date()) {
+  if (task.status !== "running") return task;
+
+  const store = await getAppStore();
+  const runs =
+    "getTaskRunsData" in store && typeof store.getTaskRunsData === "function"
+      ? await store.getTaskRunsData(task.id)
+      : (await store.snapshot(false)).runs.filter((item) => item.taskId === task.id);
+
+  const runningRuns = runs.filter((run) => run.status === "running");
+  if (runningRuns.length === 0) {
+    const nextTask: InspectionTask = {
+      ...task,
+      status: "enabled",
+      updatedAt: now.toISOString(),
+      nextRunAt: getNextRunAt(task.schedules, new Date(now.getTime() + 1_000))
+    };
+    await store.upsertTask(nextTask);
+    return nextTask;
+  }
+
+  const staleRunningRuns = runningRuns.filter((run) => now.getTime() - new Date(run.startedAt).getTime() >= STALE_RUNNING_RUN_MS);
+  if (staleRunningRuns.length === 0) return task;
+
+  for (const run of staleRunningRuns) {
+    await store.updateRun({
+      ...run,
+      completedAt: now.toISOString(),
+      status: "failed",
+      failedChecks: Math.max(run.failedChecks, run.totalChecks || run.chargedUnits || 1)
+    });
+  }
+
+  const hasFreshRunningRuns = runningRuns.length > staleRunningRuns.length;
+  const nextTask: InspectionTask = {
+    ...task,
+    status: hasFreshRunningRuns ? "running" : "enabled",
+    updatedAt: now.toISOString(),
+    nextRunAt: hasFreshRunningRuns ? task.nextRunAt : getNextRunAt(task.schedules, new Date(now.getTime() + 1_000))
+  };
+  await store.upsertTask(nextTask);
+  return nextTask;
+}
+
 function groupDevicesByProfile(devices: InspectionTask["devices"]) {
   const grouped = new Map<string, InspectionTask["devices"]>();
 
@@ -299,7 +344,8 @@ export async function listTasks() {
 
 export async function triggerDueTasks(now = new Date()) {
   const tasks = await listTasks();
-  const dueTasks = tasks.filter(
+  const reconciledTasks = await Promise.all(tasks.map((task) => reconcileRunningTaskState(task, now)));
+  const dueTasks = reconciledTasks.filter(
     (task) =>
       ["enabled", "running"].includes(task.status) &&
       task.nextRunAt &&

@@ -106,4 +106,35 @@ describe("task execution", () => {
     expect(summary.completed).toContain(task.id);
     expect(relatedRuns.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("recovers running tasks with no active runs before scanning due work", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-14T05:55:54.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "reconcile orphan running task",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [{ type: "time_range", startTime: "13:50", endTime: "14:30", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 10 }],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    const store = getMemoryStore();
+    const currentSnapshot = await store.snapshot(false);
+    const patchedTask = currentSnapshot.tasks.find((item) => item.id === task.id)!;
+    patchedTask.status = "running";
+    patchedTask.nextRunAt = "2026-03-14T05:50:00.000Z";
+    store.replace(currentSnapshot);
+
+    const summary = await triggerDueTasks(new Date("2026-03-14T05:55:54.000Z"));
+    const after = await store.snapshot(false);
+    const updatedTask = after.tasks.find((item) => item.id === task.id)!;
+
+    expect(summary.completed).toContain(task.id);
+    expect(updatedTask.status).toBe("enabled");
+    expect(updatedTask.nextRunAt).toBeTruthy();
+  });
 });
