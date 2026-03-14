@@ -1038,6 +1038,20 @@ export async function getAppStore() {
         if (error) throw error;
       }
     },
+    async updateTaskRuntime(taskId: string, patch: Partial<Pick<InspectionTask, "status" | "updatedAt" | "nextRunAt" | "closedAt" | "configErrorReason">>) {
+      invalidateReadCache();
+      const { error } = await client
+        .from("inspection_tasks")
+        .update({
+          status: patch.status,
+          updated_at: patch.updatedAt,
+          next_run_at: patch.nextRunAt ?? null,
+          closed_at: patch.closedAt ?? null,
+          config_error_reason: patch.configErrorReason ?? null
+        })
+        .eq("id", taskId);
+      if (error) throw error;
+    },
     async deleteTask(taskId: string) {
       invalidateReadCache();
       const { error } = await client.from("inspection_tasks").delete().eq("id", taskId);

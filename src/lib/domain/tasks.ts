@@ -363,7 +363,11 @@ async function reconcileRunningTaskState(task: InspectionTask, now = new Date())
       updatedAt: now.toISOString(),
       nextRunAt: getNextRunAt(task.schedules, new Date(now.getTime() + 1_000))
     };
-    await store.upsertTask(nextTask);
+    await updateTaskRuntimeFields(task.id, {
+      status: nextTask.status,
+      updatedAt: nextTask.updatedAt,
+      nextRunAt: nextTask.nextRunAt
+    });
     return nextTask;
   }
 
@@ -391,7 +395,11 @@ async function reconcileRunningTaskState(task: InspectionTask, now = new Date())
     updatedAt: now.toISOString(),
     nextRunAt: hasFreshRunningRuns ? task.nextRunAt : getNextRunAt(task.schedules, new Date(now.getTime() + 1_000))
   };
-  await store.upsertTask(nextTask);
+  await updateTaskRuntimeFields(task.id, {
+    status: nextTask.status,
+    updatedAt: nextTask.updatedAt,
+    nextRunAt: nextTask.nextRunAt
+  });
   return nextTask;
 }
 
@@ -483,6 +491,25 @@ async function getFreshTaskSummary(taskId: string) {
 
   const snapshot = await store.snapshot(false);
   return snapshot.tasks.find((item) => item.id === taskId) ?? null;
+}
+
+async function updateTaskRuntimeFields(
+  taskId: string,
+  patch: Partial<Pick<InspectionTask, "status" | "updatedAt" | "nextRunAt" | "closedAt" | "configErrorReason">>
+) {
+  const store = await getAppStore();
+
+  if ("updateTaskRuntime" in store && typeof store.updateTaskRuntime === "function") {
+    await store.updateTaskRuntime(taskId, patch);
+    return;
+  }
+
+  const currentTask = await getFreshTaskSummary(taskId);
+  if (!currentTask) return;
+  await store.upsertTask({
+    ...currentTask,
+    ...patch
+  });
 }
 
 export async function triggerDueTasks(now = new Date()) {
@@ -1043,9 +1070,7 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
       runs.push(run);
     }
 
-    await store.upsertTask({
-      ...task,
-      devices: resolvedDevices,
+    await updateTaskRuntimeFields(task.id, {
       status: executableGroups.length > 0 ? "running" : "enabled",
       updatedAt: now.toISOString(),
       nextRunAt: nextRunAtAfterDispatch
@@ -1204,8 +1229,7 @@ export async function handleTpLinkTaskCallback(payload: {
 
   const hasOtherRunningRuns = latestRuns.some((item) => item.id !== run.id && item.status === "running");
 
-  await store.upsertTask({
-    ...task,
+  await updateTaskRuntimeFields(task.id, {
     status: hasOtherRunningRuns ? "running" : "enabled",
     updatedAt: new Date().toISOString(),
     nextRunAt:

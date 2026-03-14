@@ -52,6 +52,15 @@ export function getMemoryStore() {
         store.tasks.unshift(clone(task));
       }
     },
+    updateTaskRuntime(taskId: string, patch: Partial<Pick<InspectionTask, "status" | "updatedAt" | "nextRunAt" | "closedAt" | "configErrorReason">>) {
+      const index = store.tasks.findIndex((item) => item.id === taskId);
+      if (index >= 0) {
+        store.tasks[index] = {
+          ...store.tasks[index],
+          ...clone(patch)
+        };
+      }
+    },
     deleteTask(taskId: string) {
       store.tasks = store.tasks.filter((item) => item.id !== taskId);
       store.runs = store.runs.filter((item) => item.taskId !== taskId);
