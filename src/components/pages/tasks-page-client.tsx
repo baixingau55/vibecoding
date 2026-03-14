@@ -31,42 +31,76 @@ export function TasksPageClient() {
   const [previews, setPreviews] = useState<ModuleState<Record<string, Array<{ qrCode: string; imageUrl: string }>>>>(
     createModuleState<Record<string, Array<{ qrCode: string; imageUrl: string }>>>({})
   );
+  const taskIdsKey = tasks.data.map((task) => task.id).join(",");
+  const hasTasks = tasks.data.length > 0;
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadModule<TPayload, TData>(
-      url: string,
-      setter: (next: ModuleState<TData>) => void,
-      select: (payload: TPayload) => TData,
-      fallback: TData,
-      defaultError: string
-    ) {
-      try {
-        const payload = await fetchJson<TPayload>(url);
-        if (cancelled) return;
-        setter({ data: select(payload), loading: false, error: "" });
-      } catch (error) {
-        if (cancelled) return;
-        setter({ data: fallback, loading: false, error: error instanceof Error ? error.message : defaultError });
-      }
-    }
+    (async () => {
+      const [balanceResult, algorithmsResult, tasksResult] = await Promise.allSettled([
+        fetchJson<{ balance: ServiceBalance }>("/api/service/balance"),
+        fetchJson<{ algorithms: Algorithm[] }>("/api/algorithms"),
+        fetchJson<{ tasks: InspectionTask[] }>("/api/tasks")
+      ]);
 
-    void loadModule<{ balance: ServiceBalance }, ServiceBalance | null>("/api/service/balance", setBalance, (payload) => payload.balance, null, "服务概况加载失败");
-    void loadModule<{ algorithms: Algorithm[] }, Algorithm[]>("/api/algorithms", setAlgorithms, (payload) => payload.algorithms, [], "算法列表加载失败");
-    void loadModule<{ tasks: InspectionTask[] }, InspectionTask[]>("/api/tasks", setTasks, (payload) => payload.tasks, [], "任务列表加载失败");
-    void loadModule<{ previewByTaskId: Record<string, Array<{ qrCode: string; imageUrl: string }>> }, Record<string, Array<{ qrCode: string; imageUrl: string }>>>(
-      "/api/tasks/previews",
-      setPreviews,
-      (payload) => payload.previewByTaskId,
-      {},
-      "任务预览加载失败"
-    );
+      if (cancelled) return;
+
+      setBalance(
+        balanceResult.status === "fulfilled"
+          ? { data: balanceResult.value.balance, loading: false, error: "" }
+          : { data: null, loading: false, error: balanceResult.reason instanceof Error ? balanceResult.reason.message : "服务概况加载失败" }
+      );
+      setAlgorithms(
+        algorithmsResult.status === "fulfilled"
+          ? { data: algorithmsResult.value.algorithms, loading: false, error: "" }
+          : { data: [], loading: false, error: algorithmsResult.reason instanceof Error ? algorithmsResult.reason.message : "算法列表加载失败" }
+      );
+      setTasks(
+        tasksResult.status === "fulfilled"
+          ? { data: tasksResult.value.tasks, loading: false, error: "" }
+          : { data: [], loading: false, error: tasksResult.reason instanceof Error ? tasksResult.reason.message : "任务列表加载失败" }
+      );
+    })();
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (tasks.loading || !!tasks.error) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!hasTasks) {
+      setPreviews({ data: {}, loading: false, error: "" });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPreviews((current) => ({ data: current.data, loading: true, error: "" }));
+
+    (async () => {
+      try {
+        const payload = await fetchJson<{ previewByTaskId: Record<string, Array<{ qrCode: string; imageUrl: string }>> }>("/api/tasks/previews");
+        if (cancelled) return;
+        setPreviews({ data: payload.previewByTaskId, loading: false, error: "" });
+      } catch (error) {
+        if (cancelled) return;
+        setPreviews({ data: {}, loading: false, error: error instanceof Error ? error.message : "任务预览加载失败" });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasTasks, taskIdsKey, tasks.error, tasks.loading]);
 
   return (
     <TasksWorkspace

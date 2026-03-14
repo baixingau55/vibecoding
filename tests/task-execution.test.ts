@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { executeTask, upsertTask } from "@/lib/domain/tasks";
+import { executeTask, triggerDueTasks, upsertTask } from "@/lib/domain/tasks";
 import { getServiceBalance } from "@/lib/domain/service-balance";
 import { createMockSnapshot } from "@/lib/mock-data";
 import { getMemoryStore } from "@/lib/repositories/memory-store";
@@ -58,5 +58,52 @@ describe("task execution", () => {
     });
 
     expect(task.nextRunAt).toBe("2026-03-13T09:44:00.000Z");
+  });
+
+  it("chooses the nearest nextRunAt across time points and time ranges", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-13T08:02:20.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "mixed schedule task",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [
+        { type: "time_point", startTime: "16:10", repeatDays: [0, 1, 2, 3, 4, 5, 6] },
+        { type: "time_range", startTime: "16:03", endTime: "16:20", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 5 }
+      ],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    expect(task.nextRunAt).toBe("2026-03-13T08:05:00.000Z");
+  });
+
+  it("continues scanning running tasks for later time range intervals", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-13T09:43:18.000Z"));
+
+    const snapshot = createMockSnapshot();
+    const task = await upsertTask({
+      name: "running schedule task",
+      algorithmIds: ["vehicle-parking-detection-algorithm"],
+      algorithmVersions: { "vehicle-parking-detection-algorithm": "1.0.1" },
+      devices: [snapshot.devices[0]],
+      schedules: [{ type: "time_range", startTime: "17:42", endTime: "18:00", repeatDays: [0, 1, 2, 3, 4, 5, 6], intervalMinutes: 1 }],
+      messageRule: { enabled: true, triggerMode: "every_unqualified" },
+      regionsByQrCode: {}
+    });
+
+    await executeTask(task.id);
+
+    vi.setSystemTime(new Date("2026-03-13T09:44:02.000Z"));
+    const summary = await triggerDueTasks(new Date("2026-03-13T09:44:02.000Z"));
+    const currentSnapshot = await getMemoryStore().snapshot(false);
+    const relatedRuns = currentSnapshot.runs.filter((item) => item.taskId === task.id);
+
+    expect(summary.completed).toContain(task.id);
+    expect(relatedRuns.length).toBeGreaterThanOrEqual(2);
   });
 });
