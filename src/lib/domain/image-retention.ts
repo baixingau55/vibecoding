@@ -1,7 +1,7 @@
 import { revalidateMessageReadModels, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAppStore, invalidateRepositoryReadCache } from "@/lib/repositories/app-store";
 import { ensureInspectionMediaBucket, getSupabaseAdminClient } from "@/lib/supabase/client";
-import { deleteTpLinkInspectionTaskResults } from "@/lib/tplink/client";
+import { deleteTpLinkInspectionTaskResults, fetchTpLinkDevices } from "@/lib/tplink/client";
 import type { InspectionResult, InspectionRun, MediaAsset, MessageItem } from "@/lib/types";
 
 export const IMAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -275,8 +275,24 @@ async function isResultLocalized(result: InspectionResult) {
   return Boolean(image);
 }
 
-function getRunProfileId(snapshot: Awaited<ReturnType<typeof getFreshSnapshot>>, run: InspectionRun) {
+function getRunProfileId(
+  snapshot: Awaited<ReturnType<typeof getFreshSnapshot>>,
+  run: InspectionRun,
+  liveDevices: Array<{ qrCode: string; channelId: number; profileId?: string }> = []
+) {
   if (run.profileId) return run.profileId;
+
+  const task = snapshot.tasks.find((item) => item.id === run.taskId);
+  const runResults = snapshot.results.filter((item) => item.runId === run.id);
+  const runQrCodes = runResults.map((item) => `${item.qrCode}:${item.channelId}`);
+
+  const taskProfileId =
+    task?.devices.find(
+      (device) => device.profileId && (runQrCodes.length === 0 || runQrCodes.includes(`${device.qrCode}:${device.channelId}`))
+    )?.profileId ??
+    liveDevices.find((device) => runQrCodes.includes(`${device.qrCode}:${device.channelId}`) && device.profileId)?.profileId;
+
+  if (taskProfileId) return taskProfileId;
 
   return (
     snapshot.results.find((item) => item.runId === run.id && item.profileId)?.profileId ??
@@ -288,7 +304,8 @@ async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
   if (!run.tpLinkTaskId || run.tpLinkResultsDeletedAt) return false;
 
   const snapshot = await getFreshSnapshot();
-  const profileId = getRunProfileId(snapshot, run);
+  const liveDevices = await fetchTpLinkDevices().catch(() => []);
+  const profileId = getRunProfileId(snapshot, run, liveDevices);
   if (!profileId) return false;
   const runResults = snapshot.results.filter((item) => item.runId === run.id);
   const imageResults = runResults.filter((item) => item.remoteImageUrl);
@@ -315,6 +332,7 @@ export async function getImageBackfillStatus(limit = 20) {
   const schema = await getImageRetentionSchemaStatus();
   let bucketExists = false;
   let bucketError: string | undefined;
+  const liveDevices = await fetchTpLinkDevices().catch(() => []);
 
   if (client) {
     try {
@@ -352,7 +370,7 @@ export async function getImageBackfillStatus(limit = 20) {
         return {
           runId: run.id,
           taskId: run.taskId,
-          profileId: getRunProfileId(snapshot, run),
+          profileId: getRunProfileId(snapshot, run, liveDevices),
           tpLinkTaskId: run.tpLinkTaskId,
           totalImageCount: runResults.length,
           localizedCount,
@@ -394,6 +412,7 @@ export async function getImageBackfillStatus(limit = 20) {
 
 export async function deleteLocalizedTpLinkResults(limit = 20) {
   const snapshot = await getFreshSnapshot();
+  const liveDevices = await fetchTpLinkDevices().catch(() => []);
   const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId).slice(0, Math.max(1, limit));
   const deleted: Array<{ runId: string; taskId: string; tpLinkTaskId: string; profileId: string }> = [];
   const skipped: Array<{ runId: string; reason: string }> = [];
@@ -407,7 +426,7 @@ export async function deleteLocalizedTpLinkResults(limit = 20) {
           runId: run.id,
           taskId: run.taskId,
           tpLinkTaskId: run.tpLinkTaskId!,
-          profileId: getRunProfileId(snapshot, run) ?? "unknown"
+          profileId: getRunProfileId(snapshot, run, liveDevices) ?? "unknown"
         });
       } else {
         skipped.push({
