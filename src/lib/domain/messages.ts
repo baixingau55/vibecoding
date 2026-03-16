@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 
 import { CACHE_TAGS, revalidateMessageReadModels } from "@/lib/domain/cache-tags";
-import { persistMessageImage } from "@/lib/domain/image-retention";
+import { getImageRetentionExpiresAt, persistMessageImage } from "@/lib/domain/image-retention";
 import { getAppStore } from "@/lib/repositories/app-store";
 import { getAppSnapshot } from "@/lib/domain/store";
 import type { MediaAsset, MessageItem } from "@/lib/types";
@@ -179,7 +179,7 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
         messageId,
         taskId,
         url: imageUrl,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+        expiresAt: getImageRetentionExpiresAt(),
         source: "tplink_remote",
         remoteUrl: imageUrl
       });

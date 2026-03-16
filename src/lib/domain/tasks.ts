@@ -2,7 +2,7 @@ import env from "@/lib/env";
 import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
 import { dedupeDevicesByIdentity, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
-import { persistImagesForRun } from "@/lib/domain/image-retention";
+import { getImageRetentionExpiresAt, persistImagesForRun } from "@/lib/domain/image-retention";
 import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
 import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
@@ -938,7 +938,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
             messageId: message.id,
             taskId: task.id,
             url: message.imageUrl,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+            expiresAt: getImageRetentionExpiresAt()
           }
         ]
       : []
@@ -1295,7 +1295,7 @@ export async function handleTpLinkTaskCallback(payload: {
           messageId: message.id,
           taskId: task.id,
           url: message.imageUrl,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+          expiresAt: getImageRetentionExpiresAt(),
           source: "tplink_remote",
           remoteUrl: message.imageUrl
         });

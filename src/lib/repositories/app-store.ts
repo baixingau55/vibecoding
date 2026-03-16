@@ -74,12 +74,29 @@ function isImageExpired(expiresAt: string | null | undefined) {
   return !Number.isNaN(expires) && expires <= Date.now();
 }
 
+function isLegacyRetentionExpired(baseTime: string | null | undefined, retentionMs = 7 * 24 * 60 * 60 * 1000) {
+  if (!baseTime) return false;
+  const parsed = Date.parse(baseTime);
+  if (Number.isNaN(parsed)) return false;
+  return parsed + retentionMs <= Date.now();
+}
+
+function isLocalImageRoute(url: string | null | undefined) {
+  return typeof url === "string" && url.startsWith(`${env.appBaseUrl}/api/`);
+}
+
 function resolveResultImageUrl(row: Record<string, any>) {
   if (row.image_storage_path && !isImageExpired(row.image_expires_at)) {
     return `${env.appBaseUrl}/api/results/${row.id}/image`;
   }
-  if (row.image_source === "expired") {
+  if (row.image_source === "expired" || isLegacyRetentionExpired(row.image_time)) {
     return "";
+  }
+  if (isLocalImageRoute(row.image_url)) {
+    return row.image_url;
+  }
+  if (row.image_url) {
+    return `${env.appBaseUrl}/api/results/${row.id}/image`;
   }
   return row.image_url ?? "";
 }
@@ -88,8 +105,14 @@ function resolveMessageImageUrl(row: Record<string, any>) {
   if (row.image_storage_path && !isImageExpired(row.image_expires_at)) {
     return `${env.appBaseUrl}/api/messages/${row.id}/image`;
   }
-  if (row.image_source === "expired") {
+  if (row.image_source === "expired" || isLegacyRetentionExpired(row.created_at)) {
     return undefined;
+  }
+  if (isLocalImageRoute(row.image_url)) {
+    return row.image_url;
+  }
+  if (row.image_url) {
+    return `${env.appBaseUrl}/api/messages/${row.id}/image`;
   }
   return row.image_url ?? undefined;
 }
@@ -101,6 +124,12 @@ function resolveMediaUrl(row: Record<string, any>) {
     }
     if (row.source === "expired") {
       return "";
+    }
+    if (isLocalImageRoute(row.url)) {
+      return row.url;
+    }
+    if (row.url) {
+      return `${env.appBaseUrl}/api/media/${row.id}`;
     }
   }
   return row.url;

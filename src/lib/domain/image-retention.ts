@@ -4,8 +4,30 @@ import { ensureInspectionMediaBucket, getSupabaseAdminClient } from "@/lib/supab
 import { deleteTpLinkInspectionTaskResults } from "@/lib/tplink/client";
 import type { InspectionResult, InspectionRun, MediaAsset, MessageItem } from "@/lib/types";
 
-const IMAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-const RECORD_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+export const IMAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export const RECORD_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const REMOTE_IMAGE_FETCH_TIMEOUT_MS = 30_000;
+
+type ImageRetentionSchemaStatus = {
+  ready: boolean;
+  legacyFallback: boolean;
+  missingColumns: string[];
+  tables: {
+    inspectionResults: boolean;
+    messages: boolean;
+    messageMedia: boolean;
+    inspectionRuns: boolean;
+  };
+};
+
+let imageRetentionSchemaCache:
+  | {
+      checkedAt: number;
+      status: ImageRetentionSchemaStatus;
+    }
+  | null = null;
+let imageRetentionSchemaPromise: Promise<ImageRetentionSchemaStatus> | null = null;
+const IMAGE_RETENTION_SCHEMA_TTL_MS = 30_000;
 
 function inferExtension(contentType: string | null, url: string) {
   if (contentType?.includes("png")) return "png";
@@ -28,12 +50,38 @@ function buildMessageImagePath(message: MessageItem, contentType: string | null)
   return `messages/${message.taskId}/${message.id}.${ext}`;
 }
 
+function buildMediaImagePath(media: MediaAsset, contentType: string | null) {
+  const ext = inferExtension(contentType, media.remoteUrl ?? media.url);
+  return `media/${media.taskId ?? "unknown"}/${media.messageId ?? "standalone"}/${media.id}.${ext}`;
+}
+
+export function getImageRetentionExpiresAt(base: Date | string = new Date()) {
+  const now = typeof base === "string" ? new Date(base) : base;
+  return new Date(now.getTime() + IMAGE_RETENTION_MS).toISOString();
+}
+
+function getResultImageExpiresAt(result: InspectionResult) {
+  return result.imageExpiresAt ?? getImageRetentionExpiresAt(result.imageTime);
+}
+
+function getMessageImageExpiresAt(message: MessageItem) {
+  return message.imageExpiresAt ?? getImageRetentionExpiresAt(message.createdAt);
+}
+
+function getMediaImageExpiresAt(media: MediaAsset) {
+  return media.expiresAt || getImageRetentionExpiresAt();
+}
+
 function toImageExpiry(now = new Date()) {
   return new Date(now.getTime() + IMAGE_RETENTION_MS).toISOString();
 }
 
 async function downloadRemoteImage(url: string) {
-  const response = await fetch(url, { cache: "no-store" });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REMOTE_IMAGE_FETCH_TIMEOUT_MS);
+  const response = await fetch(url, { cache: "no-store", signal: controller.signal }).finally(() => {
+    clearTimeout(timeout);
+  });
   if (!response.ok) {
     throw new Error(`Failed to download remote image: ${response.status} ${response.statusText}`);
   }
@@ -91,6 +139,80 @@ async function readStoredImage(path: string) {
   };
 }
 
+async function tryReadStoredImage(path: string) {
+  try {
+    return await readStoredImage(path);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/not found/i.test(message) || /Object not found/i.test(message) || /404/.test(message)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function getImageRetentionSchemaStatus(force = false): Promise<ImageRetentionSchemaStatus> {
+  const now = Date.now();
+  if (!force && imageRetentionSchemaCache && now - imageRetentionSchemaCache.checkedAt < IMAGE_RETENTION_SCHEMA_TTL_MS) {
+    return imageRetentionSchemaCache.status;
+  }
+
+  if (!force && imageRetentionSchemaPromise) {
+    return imageRetentionSchemaPromise;
+  }
+
+  imageRetentionSchemaPromise = (async () => {
+    const client = getSupabaseAdminClient();
+    if (!client) {
+      return {
+        ready: false,
+        legacyFallback: false,
+        missingColumns: ["supabase_admin_client"],
+        tables: {
+          inspectionResults: false,
+          messages: false,
+          messageMedia: false,
+          inspectionRuns: false
+        }
+      };
+    }
+
+    const checks = await Promise.all([
+      client.from("inspection_results").select("id,image_storage_path,image_source,image_synced_at,image_expires_at,tplink_task_id").limit(1),
+      client.from("messages").select("id,result_id,image_storage_path,image_source,image_expires_at").limit(1),
+      client.from("message_media").select("id,storage_path,source,content_type").limit(1),
+      client.from("inspection_runs").select("id,tplink_results_deleted_at,tplink_results_delete_error").limit(1)
+    ]);
+
+    const missingColumns: string[] = [];
+    const tables = {
+      inspectionResults: !checks[0].error,
+      messages: !checks[1].error,
+      messageMedia: !checks[2].error,
+      inspectionRuns: !checks[3].error
+    };
+
+    if (checks[0].error) missingColumns.push(`inspection_results: ${checks[0].error.message}`);
+    if (checks[1].error) missingColumns.push(`messages: ${checks[1].error.message}`);
+    if (checks[2].error) missingColumns.push(`message_media: ${checks[2].error.message}`);
+    if (checks[3].error) missingColumns.push(`inspection_runs: ${checks[3].error.message}`);
+
+    const status: ImageRetentionSchemaStatus = {
+      ready: missingColumns.length === 0,
+      legacyFallback: true,
+      missingColumns,
+      tables
+    };
+
+    imageRetentionSchemaCache = { checkedAt: Date.now(), status };
+    return status;
+  })().finally(() => {
+    imageRetentionSchemaPromise = null;
+  });
+
+  return imageRetentionSchemaPromise;
+}
+
 async function getFreshSnapshot() {
   const store = await getAppStore();
   return store.snapshot(false);
@@ -131,12 +253,26 @@ async function updateMediaImageMetadata(media: MediaAsset, patch: Partial<MediaA
 
 async function markRunImagesDeleted(run: InspectionRun, deletedAt = new Date().toISOString()) {
   const store = await getAppStore();
+  const schema = await getImageRetentionSchemaStatus();
+  if (!schema.tables.inspectionRuns) return;
   await store.updateRun({ ...run, tpLinkResultsDeletedAt: deletedAt, tpLinkResultsDeleteError: undefined });
 }
 
 async function markRunImageDeletionError(run: InspectionRun, message: string) {
   const store = await getAppStore();
+  const schema = await getImageRetentionSchemaStatus();
+  if (!schema.tables.inspectionRuns) return;
   await store.updateRun({ ...run, tpLinkResultsDeleteError: message });
+}
+
+async function isResultLocalized(result: InspectionResult) {
+  if (result.imageStoragePath && result.imageSource === "supabase_storage") {
+    return true;
+  }
+
+  if (!result.remoteImageUrl) return false;
+  const image = await tryReadStoredImage(buildResultImagePath(result, null));
+  return Boolean(image);
 }
 
 async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
@@ -147,7 +283,8 @@ async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
   const imageResults = runResults.filter((item) => item.remoteImageUrl);
   if (imageResults.length === 0) return false;
 
-  const allReady = imageResults.every((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
+  const readiness = await Promise.all(imageResults.map((item) => isResultLocalized(item)));
+  const allReady = readiness.every(Boolean);
   if (!allReady) return false;
 
   const response = await deleteTpLinkInspectionTaskResults([run.tpLinkTaskId], run.profileId);
@@ -164,6 +301,7 @@ async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
 export async function getImageBackfillStatus(limit = 20) {
   const client = getSupabaseAdminClient();
   const bucketName = process.env.SUPABASE_INSPECTION_MEDIA_BUCKET ?? "inspection-media";
+  const schema = await getImageRetentionSchemaStatus();
   let bucketExists = false;
   let bucketError: string | undefined;
 
@@ -216,6 +354,7 @@ export async function getImageBackfillStatus(limit = 20) {
     bucketName,
     bucketExists,
     bucketError,
+    schema,
     resultImages: {
       total: results.length,
       localized: localizedResults.length,
@@ -253,31 +392,40 @@ export async function persistResultImage(resultId: string) {
 
   const nowIso = new Date().toISOString();
   const expiresAt = toImageExpiry();
-  await updateResultImageMetadata(result, {
-    imageStoragePath: storagePath,
-    imageSource: "supabase_storage",
-    imageSyncedAt: nowIso,
-    imageExpiresAt: expiresAt
-  });
+  const schema = await getImageRetentionSchemaStatus();
+  if (schema.tables.inspectionResults) {
+    await updateResultImageMetadata(result, {
+      imageStoragePath: storagePath,
+      imageSource: "supabase_storage",
+      imageSyncedAt: nowIso,
+      imageExpiresAt: expiresAt
+    });
+  }
 
   const nextSnapshot = await getFreshSnapshot();
   const refreshedResult = nextSnapshot.results.find((item) => item.id === result.id) ?? { ...result, imageStoragePath: storagePath, imageSource: "supabase_storage", imageSyncedAt: nowIso, imageExpiresAt: expiresAt };
   const relatedMessages = findRelatedMessages(nextSnapshot, refreshedResult);
-  for (const message of relatedMessages) {
-    await updateMessageImageMetadata(message, {
-      imageStoragePath: storagePath,
-      imageSource: "supabase_storage",
-      imageExpiresAt: expiresAt
-    });
+  if (schema.tables.messages || schema.tables.messageMedia) {
+    for (const message of relatedMessages) {
+      if (schema.tables.messages) {
+        await updateMessageImageMetadata(message, {
+          imageStoragePath: storagePath,
+          imageSource: "supabase_storage",
+          imageExpiresAt: expiresAt
+        });
+      }
 
-    const media = nextSnapshot.media.filter((item) => item.messageId === message.id && item.kind === "image");
-    for (const asset of media) {
-      await updateMediaImageMetadata(asset, {
-        storagePath,
-        source: "supabase_storage",
-        expiresAt,
-        contentType: contentType ?? asset.contentType
-      });
+      if (schema.tables.messageMedia) {
+        const media = nextSnapshot.media.filter((item) => item.messageId === message.id && item.kind === "image");
+        for (const asset of media) {
+          await updateMediaImageMetadata(asset, {
+            storagePath,
+            source: "supabase_storage",
+            expiresAt,
+            contentType: contentType ?? asset.contentType
+          });
+        }
+      }
     }
   }
 
@@ -338,20 +486,25 @@ export async function persistMessageImage(messageId: string) {
   await uploadImageToStorage(storagePath, buffer, contentType);
 
   const expiresAt = toImageExpiry();
-  await updateMessageImageMetadata(message, {
-    imageStoragePath: storagePath,
-    imageSource: "supabase_storage",
-    imageExpiresAt: expiresAt
-  });
-
-  const media = snapshot.media.filter((item) => item.messageId === message.id && item.kind === "image");
-  for (const asset of media) {
-    await updateMediaImageMetadata(asset, {
-      storagePath,
-      source: "supabase_storage",
-      expiresAt,
-      contentType: contentType ?? asset.contentType
+  const schema = await getImageRetentionSchemaStatus();
+  if (schema.tables.messages) {
+    await updateMessageImageMetadata(message, {
+      imageStoragePath: storagePath,
+      imageSource: "supabase_storage",
+      imageExpiresAt: expiresAt
     });
+  }
+
+  if (schema.tables.messageMedia) {
+    const media = snapshot.media.filter((item) => item.messageId === message.id && item.kind === "image");
+    for (const asset of media) {
+      await updateMediaImageMetadata(asset, {
+        storagePath,
+        source: "supabase_storage",
+        expiresAt,
+        contentType: contentType ?? asset.contentType
+      });
+    }
   }
 
   invalidateRepositoryReadCache();
@@ -399,43 +552,57 @@ export async function backfillImages(limit = 200) {
 
 export async function pruneExpiredImages(now = new Date()) {
   const snapshot = await getFreshSnapshot();
+  const resultIsExpired = (item: InspectionResult) =>
+    Date.parse(item.imageExpiresAt ?? getResultImageExpiresAt(item)) <= now.getTime();
+  const messageIsExpired = (item: MessageItem) =>
+    Date.parse(item.imageExpiresAt ?? getMessageImageExpiresAt(item)) <= now.getTime();
+  const mediaIsExpired = (item: MediaAsset) =>
+    item.kind === "image" && Date.parse(item.expiresAt ?? getMediaImageExpiresAt(item)) <= now.getTime();
+
   const expiredResults = snapshot.results.filter(
-    (item) => item.imageStoragePath && item.imageExpiresAt && Date.parse(item.imageExpiresAt) <= now.getTime()
+    (item) => item.remoteImageUrl && resultIsExpired(item)
   );
   const expiredMessages = snapshot.messages.filter(
-    (item) => item.imageStoragePath && item.imageExpiresAt && Date.parse(item.imageExpiresAt) <= now.getTime()
+    (item) => item.remoteImageUrl && messageIsExpired(item)
   );
   const expiredMedia = snapshot.media.filter(
-    (item) => item.kind === "image" && item.storagePath && item.expiresAt && Date.parse(item.expiresAt) <= now.getTime()
+    (item) => mediaIsExpired(item)
   );
 
   await deleteStoredPaths([
-    ...expiredResults.map((item) => item.imageStoragePath ?? ""),
-    ...expiredMessages.map((item) => item.imageStoragePath ?? ""),
-    ...expiredMedia.map((item) => item.storagePath ?? "")
+    ...expiredResults.map((item) => item.imageStoragePath ?? buildResultImagePath(item, null)),
+    ...expiredMessages.map((item) => item.imageStoragePath ?? buildMessageImagePath(item, null)),
+    ...expiredMedia.map((item) => item.storagePath ?? buildMediaImagePath(item, item.contentType ?? null))
   ]);
 
-  for (const result of expiredResults) {
-    await updateResultImageMetadata(result, {
-      imageStoragePath: undefined,
-      imageSource: "expired",
-      imageExpiresAt: result.imageExpiresAt
-    });
+  const schema = await getImageRetentionSchemaStatus();
+  if (schema.tables.inspectionResults) {
+    for (const result of expiredResults) {
+      await updateResultImageMetadata(result, {
+        imageStoragePath: undefined,
+        imageSource: "expired",
+        imageExpiresAt: result.imageExpiresAt ?? getResultImageExpiresAt(result)
+      });
+    }
   }
 
-  for (const message of expiredMessages) {
-    await updateMessageImageMetadata(message, {
-      imageStoragePath: undefined,
-      imageSource: "expired",
-      imageExpiresAt: message.imageExpiresAt
-    });
+  if (schema.tables.messages) {
+    for (const message of expiredMessages) {
+      await updateMessageImageMetadata(message, {
+        imageStoragePath: undefined,
+        imageSource: "expired",
+        imageExpiresAt: message.imageExpiresAt ?? getMessageImageExpiresAt(message)
+      });
+    }
   }
 
-  for (const media of expiredMedia) {
-    await updateMediaImageMetadata(media, {
-      storagePath: undefined,
-      source: "expired"
-    });
+  if (schema.tables.messageMedia) {
+    for (const media of expiredMedia) {
+      await updateMediaImageMetadata(media, {
+        storagePath: undefined,
+        source: "expired"
+      });
+    }
   }
 
   invalidateRepositoryReadCache();
@@ -512,12 +679,18 @@ export async function getStoredResultImage(id: string) {
     throw new Error("Result not found.");
   }
 
+  const expiresAt = getResultImageExpiresAt(result);
+  if (Date.parse(expiresAt) <= Date.now()) {
+    throw new Error("Image expired.");
+  }
+
   if (result.imageStoragePath && result.imageSource === "supabase_storage") {
     return readStoredImage(result.imageStoragePath);
   }
 
-  if (result.imageSource === "expired") {
-    throw new Error("Image expired.");
+  const legacyStoredImage = await tryReadStoredImage(buildResultImagePath(result, null));
+  if (legacyStoredImage) {
+    return legacyStoredImage;
   }
 
   if (result.remoteImageUrl) {
@@ -535,12 +708,29 @@ export async function getStoredMessageImage(id: string) {
     throw new Error("Message not found.");
   }
 
+  const expiresAt = getMessageImageExpiresAt(message);
+  if (Date.parse(expiresAt) <= Date.now()) {
+    throw new Error("Image expired.");
+  }
+
+  if (message.resultId) {
+    try {
+      return await getStoredResultImage(message.resultId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!/not found/i.test(errorMessage)) {
+        throw error;
+      }
+    }
+  }
+
   if (message.imageStoragePath && message.imageSource === "supabase_storage") {
     return readStoredImage(message.imageStoragePath);
   }
 
-  if (message.imageSource === "expired") {
-    throw new Error("Image expired.");
+  const legacyStoredImage = await tryReadStoredImage(buildMessageImagePath(message, null));
+  if (legacyStoredImage) {
+    return legacyStoredImage;
   }
 
   if (message.remoteImageUrl) {
@@ -558,12 +748,24 @@ export async function getStoredMediaImage(id: string) {
     throw new Error("Media not found.");
   }
 
+  if (media.messageId) {
+    try {
+      return await getStoredMessageImage(media.messageId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!/not found/i.test(errorMessage)) {
+        throw error;
+      }
+    }
+  }
+
   if (media.storagePath && media.source === "supabase_storage") {
     return readStoredImage(media.storagePath);
   }
 
-  if (media.source === "expired") {
-    throw new Error("Image expired.");
+  const legacyStoredImage = await tryReadStoredImage(buildMediaImagePath(media, media.contentType ?? null));
+  if (legacyStoredImage) {
+    return legacyStoredImage;
   }
 
   if (media.remoteUrl) {

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
-import { backfillImages } from "@/lib/domain/image-retention";
+import { backfillImages, getImageRetentionSchemaStatus } from "@/lib/domain/image-retention";
 import env from "@/lib/env";
 
 function isAuthorized(request: NextRequest) {
@@ -21,6 +21,22 @@ export async function POST(request: NextRequest) {
 
   const payload = (await request.json().catch(() => ({}))) as { limit?: number };
   const limit = Number.isFinite(payload.limit) ? Math.min(Math.max(Number(payload.limit), 1), 1000) : 200;
-  const result = await backfillImages(limit);
-  return NextResponse.json(result);
+  const schema = await getImageRetentionSchemaStatus();
+
+  after(async () => {
+    try {
+      await backfillImages(limit);
+    } catch (error) {
+      console.error("Backfill images failed", error);
+    }
+  });
+
+  return NextResponse.json(
+    {
+      accepted: true,
+      limit,
+      schema
+    },
+    { status: 202 }
+  );
 }
