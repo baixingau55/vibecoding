@@ -9,7 +9,10 @@ import { TrendChart } from "@/components/charts/trend-chart";
 import { RegionGroupSelectorModal } from "@/components/shared/selection-modals";
 import { TaskBuilder } from "@/components/tasks/task-builder";
 import type { Algorithm, DeviceRef, InspectionFailure, InspectionResult, InspectionRun, InspectionTask, MediaAsset, MessageItem } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, readJsonResponse } from "@/lib/utils";
+
+const RESULTS_PAGE_SIZE = 8;
+const FAILURES_PAGE_SIZE = 8;
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -104,6 +107,8 @@ export function TaskDetailView({
   const [replayUrl, setReplayUrl] = useState("");
   const [replayError, setReplayError] = useState("");
   const [replayLoading, setReplayLoading] = useState(false);
+  const [resultsPage, setResultsPage] = useState(1);
+  const [failuresPage, setFailuresPage] = useState(1);
 
   useEffect(() => {
     if (algorithms.length > 0) setEditAlgorithms(algorithms);
@@ -144,6 +149,16 @@ export function TaskDetailView({
     if (selectedGroups.length === 0) return byStatus;
     return byStatus.filter((item) => selectedGroups.some((group) => item.qrCode.includes(group) || item.algorithmId.includes(group)));
   }, [rangeFilteredResults, recordTab, selectedGroups]);
+  const pagedResults = useMemo(
+    () => visibleResults.slice((resultsPage - 1) * RESULTS_PAGE_SIZE, resultsPage * RESULTS_PAGE_SIZE),
+    [resultsPage, visibleResults]
+  );
+  const pagedFailures = useMemo(
+    () => failures.slice((failuresPage - 1) * FAILURES_PAGE_SIZE, failuresPage * FAILURES_PAGE_SIZE),
+    [failures, failuresPage]
+  );
+  const totalResultsPages = Math.max(1, Math.ceil(visibleResults.length / RESULTS_PAGE_SIZE));
+  const totalFailurePages = Math.max(1, Math.ceil(failures.length / FAILURES_PAGE_SIZE));
 
   const trendData = useMemo(() => buildTrend(rangeFilteredResults, rangeFilteredMessages), [rangeFilteredMessages, rangeFilteredResults]);
   const qualifiedCount = visibleResults.filter((item) => item.result === "QUALIFIED").length;
@@ -161,6 +176,14 @@ export function TaskDetailView({
     setReplayError("");
     setReplayLoading(false);
   }, [selectedResultId, relatedVideoMedia?.url]);
+
+  useEffect(() => {
+    setResultsPage(1);
+  }, [recordTab, selectedGroups, appliedRange.start, appliedRange.end, results]);
+
+  useEffect(() => {
+    setFailuresPage(1);
+  }, [failures]);
 
   async function beginEdit() {
     if (editAlgorithms.length > 0 && editDevices.length > 0) {
@@ -201,14 +224,14 @@ export function TaskDetailView({
 
   async function refreshTask() {
     const response = await fetch(`/api/tasks/${task.id}/refresh`, { method: "POST" });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "刷新失败");
     setNotice(response.ok ? "任务数据已刷新。" : payload.error ?? "刷新失败");
     router.refresh();
   }
 
   async function closeTask() {
     const response = await fetch(`/api/tasks/${task.id}/close`, { method: "POST" });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "关闭失败");
     setClosing(false);
     setNotice(response.ok ? "任务已关闭，历史数据与消息仍可查看。" : payload.error ?? "关闭失败");
     router.refresh();
@@ -219,7 +242,7 @@ export function TaskDetailView({
     setReplayError("");
     try {
       const response = await fetch(`/api/results/${id}/replay`, { cache: "no-store" });
-      const payload = (await response.json()) as { url?: string; error?: string };
+      const payload = await readJsonResponse<{ url?: string; error?: string }>(response, "Replay fetch failed");
       if (!response.ok || !payload.url) {
         throw new Error(payload.error ?? "Replay fetch failed");
       }
@@ -360,7 +383,7 @@ export function TaskDetailView({
                     </div>
                   </article>
                 ))
-              : visibleResults.map((result) => (
+              : pagedResults.map((result) => (
                   <article key={result.id} className="ai-record-card ai-record-card-detail">
                     <div className="ai-record-image-wrap">
                       {result.imageUrl ? <img src={result.imageUrl} alt={algorithmName} className="ai-record-image-native" /> : <div className="ai-record-image-placeholder" />}
@@ -374,6 +397,17 @@ export function TaskDetailView({
                     </div>
                   </article>
                 ))}
+          </div>
+          <div className="ai-pagination-row ai-pagination-row-light">
+            <button type="button" className="ai-button ai-button-light" disabled={resultsPage <= 1} onClick={() => setResultsPage((current) => Math.max(1, current - 1))}>
+              上一页
+            </button>
+            <span>
+              第 {resultsPage} / {totalResultsPages} 页
+            </span>
+            <button type="button" className="ai-button ai-button-light" disabled={resultsPage >= totalResultsPages} onClick={() => setResultsPage((current) => Math.min(totalResultsPages, current + 1))}>
+              下一页
+            </button>
           </div>
           {resultsError ? <div className="ai-module-error">{resultsError}</div> : null}
         </div>
@@ -403,7 +437,7 @@ export function TaskDetailView({
               </tr>
             </thead>
             <tbody>
-              {failures.map((failure) => (
+              {pagedFailures.map((failure) => (
                 <tr key={failure.id}>
                   <td>{failure.qrCode}</td>
                   <td>{failure.algorithmId}</td>
@@ -414,6 +448,17 @@ export function TaskDetailView({
             </tbody>
           </table>
         )}
+        <div className="ai-pagination-row ai-pagination-row-light">
+          <button type="button" className="ai-button ai-button-light" disabled={failuresPage <= 1} onClick={() => setFailuresPage((current) => Math.max(1, current - 1))}>
+            上一页
+          </button>
+          <span>
+            第 {failuresPage} / {totalFailurePages} 页
+          </span>
+          <button type="button" className="ai-button ai-button-light" disabled={failuresPage >= totalFailurePages} onClick={() => setFailuresPage((current) => Math.min(totalFailurePages, current + 1))}>
+            下一页
+          </button>
+        </div>
         {failuresError ? <div className="ai-module-error">{failuresError}</div> : null}
       </section>
 

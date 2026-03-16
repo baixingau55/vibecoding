@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 
 import { CACHE_TAGS } from "@/lib/domain/cache-tags";
-import type { AppSnapshot, InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "@/lib/types";
+import type { AppSnapshot, InspectionOverview, RankedTask, RankingMetric, TaskTrendSeries, TrendPoint } from "@/lib/types";
 
 import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
@@ -90,6 +90,60 @@ function buildRankedTasks(snapshot: AnalyticsSnapshot, metric: RankingMetric): R
   return rankings.sort((a, b) => b[metric] - a[metric]);
 }
 
+function buildTaskTrendSeries(snapshot: AnalyticsSnapshot): TaskTrendSeries[] {
+  return snapshot.tasks.map<TaskTrendSeries>((task) => {
+    const taskResults = snapshot.results.filter((item) => item.taskId === task.id && item.result !== "UNAVAILABLE");
+    const taskMessages = snapshot.messages.filter((item) => item.taskId === task.id);
+    const grouped = new Map<string, TrendPoint>();
+
+    for (const result of taskResults) {
+      const label = result.imageTime.slice(0, 10);
+      const existing = grouped.get(label) ?? {
+        label,
+        qualifiedCount: 0,
+        unqualifiedCount: 0,
+        messageCount: 0,
+        qualifiedRate: 0,
+        unqualifiedRate: 0
+      };
+      if (result.result === "QUALIFIED") existing.qualifiedCount += 1;
+      if (result.result === "UNQUALIFIED") existing.unqualifiedCount += 1;
+      grouped.set(label, existing);
+    }
+
+    for (const message of taskMessages) {
+      const label = message.createdAt.slice(0, 10);
+      const existing = grouped.get(label) ?? {
+        label,
+        qualifiedCount: 0,
+        unqualifiedCount: 0,
+        messageCount: 0,
+        qualifiedRate: 0,
+        unqualifiedRate: 0
+      };
+      existing.messageCount += 1;
+      grouped.set(label, existing);
+    }
+
+    const points = Array.from(grouped.values())
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map((point) => {
+        const total = point.qualifiedCount + point.unqualifiedCount;
+        return {
+          ...point,
+          qualifiedRate: total === 0 ? 0 : (point.qualifiedCount / total) * 100,
+          unqualifiedRate: total === 0 ? 0 : (point.unqualifiedCount / total) * 100
+        };
+      });
+
+    return {
+      taskId: task.id,
+      taskName: task.name,
+      points
+    };
+  });
+}
+
 export async function getInspectionOverview(): Promise<InspectionOverview> {
   return buildInspectionOverview(await getAppSnapshot({ includeDevices: false }));
 }
@@ -155,6 +209,7 @@ const getCachedAnalyticsPayload = unstable_cache(
     return {
       overview: buildInspectionOverview(snapshot),
       trends: buildTrendPoints(snapshot),
+      taskTrends: buildTaskTrendSeries(snapshot),
       rankings: {
         unqualifiedRate: buildRankedTasks(snapshot, "unqualifiedRate"),
         unqualifiedCount: buildRankedTasks(snapshot, "unqualifiedCount"),
@@ -167,6 +222,7 @@ const getCachedAnalyticsPayload = unstable_cache(
   return {
     overview: buildInspectionOverview(snapshot),
     trends: buildTrendPoints(snapshot),
+    taskTrends: buildTaskTrendSeries(snapshot),
     rankings: {
       unqualifiedRate: buildRankedTasks(snapshot, "unqualifiedRate"),
       unqualifiedCount: buildRankedTasks(snapshot, "unqualifiedCount"),

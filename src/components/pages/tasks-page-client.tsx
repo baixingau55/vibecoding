@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import type { Algorithm, InspectionTask, ServiceBalance } from "@/lib/types";
+import { readJsonResponse } from "@/lib/utils";
 
 type ModuleState<T> = {
   data: T;
@@ -17,7 +18,7 @@ function createModuleState<T>(initial: T): ModuleState<T> {
 
 async function fetchJson<T>(url: string) {
   const response = await fetch(url, { cache: "no-store" });
-  const payload = (await response.json()) as T & { error?: string };
+  const payload = await readJsonResponse<T & { error?: string }>(response, "Request failed");
   if (!response.ok) {
     throw new Error(payload.error ?? "Request failed");
   }

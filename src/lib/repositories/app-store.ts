@@ -15,6 +15,7 @@ import type {
   InspectionSchedule,
   InspectionTask,
   MediaAsset,
+  MessageAlertCounter,
   MessageItem,
   PurchaseRecord,
   RegionShape,
@@ -351,6 +352,20 @@ function toMediaByMessage(media: MediaAsset[]) {
   return media.reduce<Record<string, MediaAsset[]>>((accumulator, asset) => {
     if (!asset.messageId) return accumulator;
     (accumulator[asset.messageId] ??= []).push(asset);
+    return accumulator;
+  }, {});
+}
+
+async function getCompletedRunCountMap(client: NonNullable<ReturnType<typeof getSupabaseAdminClient>>) {
+  const { data, error } = await client.from("inspection_runs").select("task_id,status");
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).reduce<Record<string, number>>((accumulator, row) => {
+    if (row.status === "completed" || row.status === "partial_success") {
+      accumulator[row.task_id] = (accumulator[row.task_id] ?? 0) + 1;
+    }
     return accumulator;
   }, {});
 }
@@ -815,7 +830,10 @@ export async function getAppStore() {
     },
     async listTasksData() {
       return withReadCache("tasks:list", async () => {
-        const liveDevices = await fetchTpLinkDevices().catch(() => [] as DeviceRef[]);
+        const [liveDevices, completedRunCountMap] = await Promise.all([
+          fetchTpLinkDevices().catch(() => [] as DeviceRef[]),
+          getCompletedRunCountMap(client).catch(() => ({} as Record<string, number>))
+        ]);
         const nestedRes = await client
           .from("inspection_tasks")
           .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
@@ -829,7 +847,8 @@ export async function getAppStore() {
             nestedRes.data.flatMap((row) => row.inspection_task_regions ?? [])
           ).map((task) => ({
             ...task,
-            devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+            devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices,
+            completedRunCount: completedRunCountMap[task.id] ?? 0
           }));
         }
 
@@ -843,7 +862,8 @@ export async function getAppStore() {
         if (errors.length > 0) throw errors[0];
         return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []).map((task) => ({
           ...task,
-          devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+          devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices,
+          completedRunCount: completedRunCountMap[task.id] ?? 0
         }));
       });
     },
@@ -1482,6 +1502,49 @@ export async function getAppStore() {
           .eq("id", asset.id));
       }
       if (error) throw error;
+    },
+    async getMessageAlertCounter(taskId: string, qrCode: string, algorithmId: string, counterDate: string) {
+      return withReadCache(`message-alert:${taskId}:${qrCode}:${algorithmId}:${counterDate}`, async () => {
+        const { data, error } = await client
+          .from("message_alert_counters")
+          .select("*")
+          .eq("task_id", taskId)
+          .eq("qr_code", qrCode)
+          .eq("algorithm_id", algorithmId)
+          .eq("counter_date", counterDate)
+          .maybeSingle();
+
+        if (error && !isMissingTableError(error)) throw error;
+        if (!data) return null;
+        return {
+          id: data.id,
+          taskId: data.task_id,
+          qrCode: data.qr_code,
+          algorithmId: data.algorithm_id,
+          counterDate: data.counter_date,
+          consecutiveUnqualifiedCount: data.consecutive_unqualified_count ?? 0,
+          lastResult: data.last_result ?? undefined,
+          lastAlertAt: data.last_alert_at ?? undefined
+        } satisfies MessageAlertCounter;
+      });
+    },
+    async upsertMessageAlertCounter(counter: MessageAlertCounter) {
+      invalidateReadCache();
+      const { error } = await client.from("message_alert_counters").upsert(
+        {
+          id: counter.id,
+          task_id: counter.taskId,
+          qr_code: counter.qrCode,
+          algorithm_id: counter.algorithmId,
+          counter_date: counter.counterDate,
+          consecutive_unqualified_count: counter.consecutiveUnqualifiedCount,
+          last_result: counter.lastResult ?? null,
+          last_alert_at: counter.lastAlertAt ?? null,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "task_id,qr_code,algorithm_id,counter_date" }
+      );
+      if (error && !isMissingTableError(error) && !isMissingColumnError(error)) throw error;
     },
     async addSchedulerScan(scan: SchedulerScan) {
       invalidateReadCache();

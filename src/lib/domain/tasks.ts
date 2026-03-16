@@ -25,6 +25,7 @@ import type {
   InspectionRun,
   InspectionTask,
   MediaAsset,
+  MessageAlertCounter,
   MessageItem,
   RegionShape,
   SchedulerScan
@@ -61,6 +62,11 @@ function getShanghaiParts(base: Date) {
 
 function createShanghaiDate(year: number, month: number, day: number, hour: number, minute: number) {
   return new Date(Date.UTC(year, month, day, hour - 8, minute, 0, 0));
+}
+
+function formatShanghaiDateKey(value: string | Date) {
+  const parts = getShanghaiParts(typeof value === "string" ? new Date(value) : value);
+  return `${parts.year}-${`${parts.month + 1}`.padStart(2, "0")}-${`${parts.day}`.padStart(2, "0")}`;
 }
 
 function parseClock(value: string) {
@@ -262,6 +268,131 @@ function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: In
     imageSource: result.imageUrl ? "tplink_remote" : undefined,
     remoteImageUrl: result.remoteImageUrl ?? result.imageUrl
   };
+}
+
+function getMessageTitle(task: InspectionTask) {
+  return task.messageRule.customMessageType?.trim() || `${task.name} 巡检不合格`;
+}
+
+function getMessageDescription(task: InspectionTask) {
+  if (task.messageRule.customMessageContent?.trim()) {
+    return task.messageRule.customMessageContent.trim();
+  }
+
+  if (task.messageRule.triggerMode === "continuous_unqualified") {
+    return `同一监控点一天内连续 ${task.messageRule.continuousCount ?? 3} 次巡检不合格时推送消息`;
+  }
+
+  return "监控点每次巡检不合格时推送消息";
+}
+
+async function readMessageAlertCounter(
+  store: Awaited<ReturnType<typeof getAppStore>>,
+  taskId: string,
+  qrCode: string,
+  algorithmId: string,
+  counterDate: string
+) {
+  if ("getMessageAlertCounter" in store && typeof store.getMessageAlertCounter === "function") {
+    return (await store.getMessageAlertCounter(taskId, qrCode, algorithmId, counterDate)) as MessageAlertCounter | null;
+  }
+
+  const snapshot = await store.snapshot(false);
+  return (
+    snapshot.messageAlertCounters?.find(
+      (item) =>
+        item.taskId === taskId &&
+        item.qrCode === qrCode &&
+        item.algorithmId === algorithmId &&
+        item.counterDate === counterDate
+    ) ?? null
+  );
+}
+
+async function saveMessageAlertCounter(store: Awaited<ReturnType<typeof getAppStore>>, counter: MessageAlertCounter) {
+  if ("upsertMessageAlertCounter" in store && typeof store.upsertMessageAlertCounter === "function") {
+    await store.upsertMessageAlertCounter(counter);
+  }
+}
+
+async function buildInspectionMessages(
+  task: InspectionTask,
+  runId: string,
+  results: InspectionResult[],
+  idResolver?: (result: InspectionResult) => { messageId?: string; imageId?: string }
+) {
+  if (!task.messageRule.enabled) return [] as MessageItem[];
+
+  const store = await getAppStore();
+  const ordered = [...results].sort((left, right) => left.imageTime.localeCompare(right.imageTime));
+  const messages: MessageItem[] = [];
+
+  for (const result of ordered) {
+    const counterDate = formatShanghaiDateKey(result.imageTime);
+    const currentCounter = await readMessageAlertCounter(store, task.id, result.qrCode, result.algorithmId, counterDate);
+    const nextCounter: MessageAlertCounter = currentCounter ?? {
+      id: slugId("msgcounter"),
+      taskId: task.id,
+      qrCode: result.qrCode,
+      algorithmId: result.algorithmId,
+      counterDate,
+      consecutiveUnqualifiedCount: 0
+    };
+
+    if (result.result !== "UNQUALIFIED") {
+      nextCounter.consecutiveUnqualifiedCount = 0;
+      nextCounter.lastResult = result.result;
+      await saveMessageAlertCounter(store, nextCounter);
+      continue;
+    }
+
+    let shouldAlert = false;
+    if (task.messageRule.triggerMode === "continuous_unqualified") {
+      const threshold = Math.max(1, task.messageRule.continuousCount ?? 3);
+      nextCounter.consecutiveUnqualifiedCount =
+        nextCounter.lastResult === "UNQUALIFIED" ? nextCounter.consecutiveUnqualifiedCount + 1 : 1;
+      shouldAlert = nextCounter.consecutiveUnqualifiedCount >= threshold;
+    } else {
+      nextCounter.consecutiveUnqualifiedCount = 1;
+      shouldAlert = true;
+    }
+
+    nextCounter.lastResult = "UNQUALIFIED";
+
+    if (!shouldAlert) {
+      await saveMessageAlertCounter(store, nextCounter);
+      continue;
+    }
+
+    nextCounter.consecutiveUnqualifiedCount = 0;
+    nextCounter.lastAlertAt = result.imageTime;
+    await saveMessageAlertCounter(store, nextCounter);
+
+    const overrideIds = idResolver?.(result);
+    messages.push({
+      id: overrideIds?.messageId ?? slugId("msg"),
+      taskId: task.id,
+      runId,
+      resultId: result.id,
+      type: "inspection_unqualified",
+      read: false,
+      title: getMessageTitle(task),
+      description: getMessageDescription(task),
+      result: "UNQUALIFIED",
+      qrCode: result.qrCode,
+      channelId: result.channelId,
+      algorithmId: result.algorithmId,
+      createdAt: result.imageTime,
+      imageUrl: result.imageUrl,
+      imageId: result.imageUrl ? overrideIds?.imageId ?? slugId("image") : undefined,
+      videoTaskId: undefined,
+      profileId: result.profileId,
+      imageSource: result.imageUrl ? "tplink_remote" : undefined,
+      remoteImageUrl: result.remoteImageUrl ?? result.imageUrl
+    });
+  }
+
+  return messages;
 }
 
 function deterministicId(prefix: string, ...parts: Array<string | number | undefined | null>) {
@@ -963,7 +1094,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
       channelId: task.devices[0].channelId,
       algorithmId: task.algorithmIds[0],
       algorithmVersion: task.algorithmVersions[task.algorithmIds[0]] ?? "latest",
-      imageUrl: task.devices[0].previewImage,
+      imageUrl: "",
       imageTime: startedAt,
       result: "UNQUALIFIED",
       profileId: task.devices[0].profileId
@@ -986,7 +1117,7 @@ async function simulateTaskExecution(task: InspectionTask, chargeUnitsCount: num
         ]
       : [];
 
-  const messages = results.map((result) => buildUnqualifiedMessage(task, run.id, result)).filter(Boolean) as MessageItem[];
+  const messages = await buildInspectionMessages(task, run.id, results);
 
   const mediaAssets: MediaAsset[] = messages.flatMap((message) =>
     message.imageId && message.imageUrl
@@ -1334,7 +1465,6 @@ export async function handleTpLinkTaskCallback(payload: {
 
   const results: InspectionResult[] = [];
   const failures: InspectionFailure[] = [];
-  const messages: MessageItem[] = [];
   const mediaAssets: MediaAsset[] = [];
   const existingResults = snapshot.results.filter((item) => item.runId === run.id);
   const existingFailures = snapshot.failures.filter((item) => item.runId === run.id);
@@ -1379,30 +1509,26 @@ export async function handleTpLinkTaskCallback(payload: {
     };
     results.push(result);
 
-    const message = buildUnqualifiedMessage(task, run.id, result);
-    if (message) {
-      const { messageId, imageId } = buildCallbackMessageIds(task, result);
-      message.id = messageId;
-      message.imageId = imageId;
-      messages.push(message);
-      if (message.imageId && message.imageUrl) {
-        mediaAssets.push({
-          id: message.imageId,
-          kind: "image",
-          messageId: message.id,
-          taskId: task.id,
-          url: message.imageUrl,
-          expiresAt: getImageRetentionExpiresAt(),
-          source: "tplink_remote",
-          remoteUrl: message.imageUrl
-        });
-      }
-    }
   }
 
   const newResults = results.filter((item) => !existingResultIds.has(item.id));
   const newFailures = failures.filter((item) => !existingFailureIds.has(item.id));
-  const newMessages = messages.filter((item) => !existingMessageIds.has(item.id));
+  const generatedMessages = await buildInspectionMessages(task, run.id, newResults, (result) => buildCallbackMessageIds(task, result));
+  const newMessages = generatedMessages.filter((item) => !existingMessageIds.has(item.id));
+  for (const message of newMessages) {
+    if (message.imageId && message.imageUrl) {
+      mediaAssets.push({
+        id: message.imageId,
+        kind: "image",
+        messageId: message.id,
+        taskId: task.id,
+        url: message.imageUrl,
+        expiresAt: getImageRetentionExpiresAt(),
+        source: "tplink_remote",
+        remoteUrl: message.imageUrl
+      });
+    }
+  }
   const newMediaAssets = mediaAssets.filter((item) => !existingMediaIds.has(item.id));
 
   const totalSuccessfulChecks = existingResults.length + newResults.length;

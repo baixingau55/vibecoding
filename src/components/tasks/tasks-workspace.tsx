@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, MoreHorizontal, RefreshCw, X } from "lucide-react";
 
 import type { Algorithm, InspectionTask, PurchaseRecord, ServiceBalance } from "@/lib/types";
-import { formatDateTime, formatNumber } from "@/lib/utils";
+import { formatDateTime, formatNumber, readJsonResponse } from "@/lib/utils";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -18,12 +18,16 @@ function getStatusMeta(task: InspectionTask) {
       return { text: "任务已关闭", dot: "#B3B3B3", issue: "" };
     case "config_error":
       return {
-        text: "任务异常",
+        text: "配置异常",
         dot: "#FFC400",
         issue: task.configErrorReason ?? "任务配置异常"
       };
     case "running":
       return { text: "执行中", dot: "#1785E6", issue: "" };
+    case "partial_success":
+      return { text: "部分成功", dot: "#1785E6", issue: "" };
+    case "completed":
+    case "enabled":
     default:
       return { text: "任务已开启", dot: "#24B354", issue: "" };
   }
@@ -79,7 +83,7 @@ export function TasksWorkspace({
 }) {
   const router = useRouter();
   const [showConfigOnly, setShowConfigOnly] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("全部");
+  const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled">("all");
   const [query, setQuery] = useState("");
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -90,12 +94,20 @@ export function TasksWorkspace({
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
   const [loadingTaskId, setLoadingTaskId] = useState("");
   const [notice, setNotice] = useState("");
+  const [localTasks, setLocalTasks] = useState(tasks);
+  const [pendingDeletedTaskIds, setPendingDeletedTaskIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setLocalTasks(tasks);
+    setPendingDeletedTaskIds([]);
+  }, [tasks]);
 
   const visibleTasks = useMemo(() => {
-    return tasks.filter((task) => {
+    return localTasks.filter((task) => {
+      if (pendingDeletedTaskIds.includes(task.id)) return false;
       if (showConfigOnly && task.status !== "config_error") return false;
-      if (statusFilter === "已开启" && !["enabled", "running", "partial_success", "completed"].includes(task.status)) return false;
-      if (statusFilter === "已关闭" && task.status !== "disabled") return false;
+      if (statusFilter === "enabled" && !["enabled", "running", "partial_success", "completed"].includes(task.status)) return false;
+      if (statusFilter === "disabled" && task.status !== "disabled") return false;
       if (
         query.trim() &&
         !task.name.includes(query.trim()) &&
@@ -106,7 +118,7 @@ export function TasksWorkspace({
       }
       return true;
     });
-  }, [query, showConfigOnly, statusFilter, tasks]);
+  }, [localTasks, pendingDeletedTaskIds, query, showConfigOnly, statusFilter]);
 
   function getAlgorithmName(id: string) {
     return algorithms.find((item) => item.id === id)?.name ?? id;
@@ -116,7 +128,7 @@ export function TasksWorkspace({
     setLoadingTaskId(taskId);
     setNotice("");
     const response = await fetch(`/api/tasks/${taskId}/refresh`, { method: "POST" });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "刷新失败");
     setLoadingTaskId("");
     setNotice(response.ok ? "任务已刷新，正在更新巡检结果。" : payload.error ?? "刷新失败");
     router.refresh();
@@ -126,7 +138,7 @@ export function TasksWorkspace({
     setLoadingTaskId(taskId);
     setNotice("");
     const response = await fetch(`/api/tasks/${taskId}/close`, { method: "POST" });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "关闭失败");
     setLoadingTaskId("");
     setActiveMenuTaskId(null);
     setNotice(response.ok ? "任务已关闭，历史数据与消息仍可查看。" : payload.error ?? "关闭失败");
@@ -137,9 +149,13 @@ export function TasksWorkspace({
     setLoadingTaskId(taskId);
     setNotice("");
     const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "删除失败");
     setLoadingTaskId("");
     setActiveMenuTaskId(null);
+    if (response.ok) {
+      setPendingDeletedTaskIds((current) => [...current, taskId]);
+      setLocalTasks((current) => current.filter((item) => item.id !== taskId));
+    }
     setNotice(response.ok ? "任务已删除。" : payload.error ?? "删除失败");
     router.refresh();
   }
@@ -151,7 +167,7 @@ export function TasksWorkspace({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount })
     });
-    const payload = (await response.json()) as { error?: string };
+    const payload = await readJsonResponse<{ error?: string }>(response, "购买失败");
     if (!response.ok) {
       setNotice(payload.error ?? "购买失败");
       return;
@@ -168,7 +184,7 @@ export function TasksWorkspace({
     setHistoryError("");
     try {
       const response = await fetch("/api/service/purchase-history", { cache: "no-store" });
-      const payload = (await response.json()) as { records?: PurchaseRecord[]; error?: string };
+      const payload = await readJsonResponse<{ records?: PurchaseRecord[]; error?: string }>(response, "购买历史加载失败");
       if (!response.ok) {
         throw new Error(payload.error ?? "购买历史加载失败");
       }
@@ -180,7 +196,7 @@ export function TasksWorkspace({
     }
   }
 
-  const configErrorCount = tasks.filter((item) => item.status === "config_error").length;
+  const configErrorCount = localTasks.filter((item) => item.status === "config_error").length;
 
   return (
     <div className="ai-page ai-task-list-page">
@@ -235,15 +251,15 @@ export function TasksWorkspace({
           <div className="ai-filter-group ai-filter-group-compact">
             <label className="ai-checkbox ai-checkbox-compact">
               <input type="checkbox" checked={showConfigOnly} onChange={(event) => setShowConfigOnly(event.target.checked)} />
-              <span>仅显示配置异常的任务（{configErrorCount}个）</span>
+              <span>仅显示配置异常任务（{configErrorCount}个）</span>
             </label>
 
             <label className="ai-field-label ai-field-label-compact">
-              <span>任务开启状态</span>
-              <select className="ai-input ai-input-select ai-toolbar-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option>全部</option>
-                <option>已开启</option>
-                <option>已关闭</option>
+              <span>任务状态</span>
+              <select className="ai-input ai-input-select ai-toolbar-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "enabled" | "disabled")}>
+                <option value="all">全部</option>
+                <option value="enabled">已开启</option>
+                <option value="disabled">已关闭</option>
               </select>
             </label>
 
@@ -273,7 +289,7 @@ export function TasksWorkspace({
       ) : visibleTasks.length === 0 ? (
         <section className="ai-empty-state">
           <h2>请添加巡检任务</h2>
-          <p>当前还没有符合筛选条件的巡检任务，去选择算法并创建一个任务吧。</p>
+          <p>当前没有符合筛选条件的巡检任务，去选择算法并创建一个任务吧。</p>
           <Link href="/tasks/select" className="ai-button ai-button-primary">
             添加巡检任务
           </Link>
@@ -282,9 +298,7 @@ export function TasksWorkspace({
         <section className="ai-task-grid ai-task-grid-ui">
           {visibleTasks.map((task) => {
             const status = getStatusMeta(task);
-            const previewCaptures = previewByTaskId[task.id] ?? [];
-            const previewDevices = task.devices.slice(0, 3).map((device) => ({ qrCode: device.qrCode, imageUrl: device.previewImage }));
-            const previews = previewCaptures.length > 0 ? previewCaptures : previewDevices;
+            const previews = (previewByTaskId[task.id] ?? []).slice(0, 3);
 
             return (
               <article key={task.id} className={cn("ai-task-card ai-task-card-ui", activeMenuTaskId === task.id && "ai-task-card-menu-open")}>
@@ -309,20 +323,12 @@ export function TasksWorkspace({
                 {status.issue ? <div className="ai-task-card-warning">{status.issue}</div> : null}
 
                 <div className="ai-task-preview-box ai-task-preview-box-ui">
-                  <div className="ai-task-preview-label">任务执行完成次数：{task.status === "running" ? "执行中" : "查看详情"}</div>
+                  <div className="ai-task-preview-label">任务执行完成次数：{task.completedRunCount ?? 0}</div>
                   <div className="ai-task-preview-grid ai-task-preview-grid-ui">
                     {loadingPreviews ? (
-                      previews.length > 0 ? (
-                        previews.map((item) => (
-                          <div key={`${task.id}-${item.qrCode}-preview-skeleton`} className="ai-task-preview-item ai-task-preview-item-ui">
-                            <div className="ai-task-preview-placeholder" />
-                          </div>
-                        ))
-                      ) : (
-                        <div className="ai-task-preview-empty">预览加载中</div>
-                      )
+                      <div className="ai-task-preview-empty">预览加载中</div>
                     ) : previews.length === 0 ? (
-                      <div className="ai-task-preview-empty">等待巡检</div>
+                      <div className="ai-task-preview-empty">暂无真实抓拍图</div>
                     ) : (
                       previews.map((item) => (
                         <div key={`${task.id}-${item.qrCode}-${item.imageUrl}`} className="ai-task-preview-item ai-task-preview-item-ui">
@@ -390,7 +396,7 @@ export function TasksWorkspace({
               <div className="ai-modal-subtitle">购买算法分析次数（所有云端算法共用）</div>
               <div className="ai-purchase-box">
                 <div className="ai-price-line">
-                  收费标准 <strong>￥3.99</strong> / 千次
+                  收费标准 <strong>¥3.99</strong> / 千次
                 </div>
                 <div className="ai-stepper-row">
                   <span>购买服务量</span>
@@ -399,7 +405,9 @@ export function TasksWorkspace({
                       -
                     </button>
                     <span>{purchaseCount}</span>
-                    <button type="button" onClick={() => setPurchaseCount((current) => current + 1)}>+</button>
+                    <button type="button" onClick={() => setPurchaseCount((current) => current + 1)}>
+                      +
+                    </button>
                   </div>
                   <span>千次</span>
                 </div>
@@ -407,7 +415,7 @@ export function TasksWorkspace({
             </div>
             <div className="ai-modal-footer">
               <div className="ai-modal-total">
-                合计 <strong>￥{(purchaseCount * 3.99).toFixed(2)}</strong>
+                合计 <strong>¥{(purchaseCount * 3.99).toFixed(2)}</strong>
               </div>
               <button type="button" className="ai-button ai-button-primary" onClick={() => void purchaseTimes()}>
                 余额支付
@@ -440,8 +448,13 @@ export function TasksWorkspace({
                 </div>
               ) : historyError ? (
                 <div className="ai-module-error">{historyError}</div>
+              ) : purchaseHistory.length === 0 ? (
+                <div className="ai-empty-state ai-empty-state-compact">
+                  <h2>暂无购买历史</h2>
+                  <p>当前还没有购买记录。</p>
+                </div>
               ) : (
-                <table className="ai-table">
+                <table className="ai-table ai-history-table">
                   <thead>
                     <tr>
                       <th>序号</th>

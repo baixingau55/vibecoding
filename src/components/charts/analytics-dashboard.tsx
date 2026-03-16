@@ -5,7 +5,7 @@ import { RefreshCw } from "lucide-react";
 
 import { TrendChart } from "@/components/charts/trend-chart";
 import { RegionGroupSelectorModal, TaskSelectorModal } from "@/components/shared/selection-modals";
-import type { InspectionOverview, RankedTask, RankingMetric, TrendPoint } from "@/lib/types";
+import type { InspectionOverview, RankedTask, RankingMetric, TaskTrendSeries, TrendPoint } from "@/lib/types";
 import { formatPercent } from "@/lib/utils";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -15,11 +15,13 @@ function cn(...parts: Array<string | false | null | undefined>) {
 export function AnalyticsDashboard({
   overview,
   trends,
-  rankings
+  rankings,
+  taskTrends
 }: {
   overview: InspectionOverview;
   trends: TrendPoint[];
   rankings: Record<RankingMetric, RankedTask[]>;
+  taskTrends: TaskTrendSeries[];
 }) {
   const [rankingMetric, setRankingMetric] = useState<"unqualifiedRate" | "unqualifiedCount" | "messageCount">("unqualifiedRate");
   const [trendMetric, setTrendMetric] = useState<"unqualifiedRate" | "qualifiedRate" | "messageCount">("unqualifiedRate");
@@ -50,10 +52,18 @@ export function AnalyticsDashboard({
     });
   }, [rankingMetric, rankings, selectedTaskIds, sortDirection]);
 
-  const visibleTrendTasks = useMemo(() => {
-    const source = selectedTaskIds.length > 0 ? rankings.unqualifiedRate.filter((item) => selectedTaskIds.includes(item.taskId)) : rankings.unqualifiedRate;
-    return source.slice(0, 5);
-  }, [rankings.unqualifiedRate, selectedTaskIds]);
+  const filteredTaskTrends = useMemo(() => {
+    const source = selectedTaskIds.length > 0 ? taskTrends.filter((item) => selectedTaskIds.includes(item.taskId)) : taskTrends;
+    return source.map((series) => ({
+      ...series,
+      points: series.points.filter((point) => {
+        const day = point.label;
+        if (appliedRange.start && day < appliedRange.start) return false;
+        if (appliedRange.end && day > appliedRange.end) return false;
+        return true;
+      })
+    }));
+  }, [appliedRange.end, appliedRange.start, selectedTaskIds, taskTrends]);
 
   const filteredOverview = useMemo<InspectionOverview>(() => {
     if (filteredTrends.length === 0) {
@@ -214,18 +224,23 @@ export function AnalyticsDashboard({
             </tr>
           </thead>
           <tbody>
-            {visibleTrendTasks.map((task) => (
+            {filteredTaskTrends.map((task) => (
               <tr key={task.taskId}>
                 <td>{task.taskName}</td>
-                {filteredTrends.map((point) => (
-                  <td key={`${task.taskId}-${point.label}`}>
-                    {trendMetric === "qualifiedRate"
-                      ? formatPercent(point.qualifiedRate)
-                      : trendMetric === "messageCount"
-                        ? point.messageCount
-                        : formatPercent(point.unqualifiedRate)}
-                  </td>
-                ))}
+                {filteredTrends.map((point) => {
+                  const currentPoint = task.points.find((item) => item.label === point.label);
+                  return (
+                    <td key={`${task.taskId}-${point.label}`}>
+                      {!currentPoint
+                        ? "-"
+                        : trendMetric === "qualifiedRate"
+                          ? formatPercent(currentPoint.qualifiedRate)
+                          : trendMetric === "messageCount"
+                            ? currentPoint.messageCount
+                            : formatPercent(currentPoint.unqualifiedRate)}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

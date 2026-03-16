@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import type { MediaAsset, MessageItem } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, readJsonResponse } from "@/lib/utils";
 
 const MESSAGE_TYPE_LABELS: Record<string, string> = {
   all: "全部消息",
@@ -25,6 +25,8 @@ const DEFAULT_FILTER_STATE: FilterState = {
   type: "all"
 };
 
+const MESSAGE_PAGE_SIZE = 10;
+
 export function MessageCenter({
   initialMessages,
   mediaByMessage
@@ -44,6 +46,7 @@ export function MessageCenter({
   const [replayUrl, setReplayUrl] = useState("");
   const [replayError, setReplayError] = useState("");
   const [replayLoading, setReplayLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
   const messageTypes = useMemo(() => Array.from(new Set(messages.map((item) => item.type))), [messages]);
 
@@ -61,7 +64,14 @@ export function MessageCenter({
     });
   }, [activeType, appliedFilter, messages, query]);
 
-  const selectedMessage = filteredMessages.find((item) => item.id === selectedId) ?? messages.find((item) => item.id === selectedId) ?? null;
+  useEffect(() => {
+    setPage(1);
+  }, [activeType, appliedFilter, query, messages]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMessages.length / MESSAGE_PAGE_SIZE));
+  const pagedMessages = filteredMessages.slice((page - 1) * MESSAGE_PAGE_SIZE, page * MESSAGE_PAGE_SIZE);
+
+  const selectedMessage = pagedMessages.find((item) => item.id === selectedId) ?? filteredMessages.find((item) => item.id === selectedId) ?? messages.find((item) => item.id === selectedId) ?? null;
   const selectedIndex = filteredMessages.findIndex((item) => item.id === selectedId);
   const selectedMedia = selectedMessage ? mediaByMessage[selectedMessage.id] ?? [] : [];
   const imageMedia = selectedMedia.find((item) => item.kind === "image");
@@ -102,7 +112,7 @@ export function MessageCenter({
     setReplayError("");
     try {
       const response = await fetch(`/api/messages/${id}/replay`, { cache: "no-store" });
-      const payload = (await response.json()) as { url?: string; error?: string };
+      const payload = await readJsonResponse<{ url?: string; error?: string }>(response, "Replay fetch failed");
       if (!response.ok || !payload.url) {
         throw new Error(payload.error ?? "Replay fetch failed");
       }
@@ -199,7 +209,7 @@ export function MessageCenter({
               </tr>
             </thead>
             <tbody>
-              {filteredMessages.map((message, index) => (
+              {pagedMessages.map((message, index) => (
                 <tr key={message.id}>
                   <td>
                     <input
@@ -214,7 +224,7 @@ export function MessageCenter({
                   </td>
                   <td>
                     {!message.read ? <span className="ai-message-unread-dot" /> : null}
-                    {index + 1}
+                    {(page - 1) * MESSAGE_PAGE_SIZE + index + 1}
                   </td>
                   <td>
                     <strong>{message.title}</strong>
@@ -258,6 +268,17 @@ export function MessageCenter({
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="ai-pagination-row ai-pagination-row-light">
+          <button type="button" className="ai-button ai-button-light" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+            上一页
+          </button>
+          <span>
+            第 {page} / {totalPages} 页
+          </span>
+          <button type="button" className="ai-button ai-button-light" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+            下一页
+          </button>
         </div>
       </section>
 

@@ -27,18 +27,6 @@ export async function getLatestPreviewForDevice(qrCode: string, profileId?: stri
     };
   }
 
-  const device = snapshot.devices.find(
-    (item: DeviceRef) => item.qrCode === qrCode && (!profileId || item.profileId === profileId)
-  );
-
-  if (device?.previewImage) {
-    return {
-      url: device.previewImage,
-      source: "fallback-device" as const,
-      imageTime: undefined
-    };
-  }
-
   return null;
 }
 

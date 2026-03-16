@@ -184,6 +184,21 @@ create table if not exists scheduler_scans (
   error_summary text
 );
 
+create table if not exists message_alert_counters (
+  id text primary key,
+  task_id text not null references inspection_tasks(id) on delete cascade,
+  qr_code text not null,
+  algorithm_id text not null,
+  counter_date text not null,
+  consecutive_unqualified_count integer not null default 0,
+  last_result text,
+  last_alert_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists message_alert_counters_identity_idx
+  on message_alert_counters(task_id, qr_code, algorithm_id, counter_date);
+
 alter table inspection_runs add column if not exists tplink_results_deleted_at timestamptz;
 alter table inspection_runs add column if not exists tplink_results_delete_error text;
 alter table inspection_results add column if not exists image_storage_path text;
@@ -197,3 +212,7 @@ alter table messages add column if not exists image_expires_at timestamptz;
 alter table message_media add column if not exists storage_path text;
 alter table message_media add column if not exists source text;
 alter table message_media add column if not exists content_type text;
+alter table message_alert_counters add column if not exists consecutive_unqualified_count integer not null default 0;
+alter table message_alert_counters add column if not exists last_result text;
+alter table message_alert_counters add column if not exists last_alert_at timestamptz;
+alter table message_alert_counters add column if not exists updated_at timestamptz not null default now();

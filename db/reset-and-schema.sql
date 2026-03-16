@@ -1,6 +1,7 @@
 drop table if exists message_media cascade;
 drop table if exists messages cascade;
 drop table if exists scheduler_scans cascade;
+drop table if exists message_alert_counters cascade;
 drop table if exists inspection_failures cascade;
 drop table if exists inspection_results cascade;
 drop table if exists inspection_runs cascade;
@@ -201,3 +202,18 @@ create table if not exists scheduler_scans (
   failed_count integer not null,
   error_summary text
 );
+
+create table if not exists message_alert_counters (
+  id text primary key,
+  task_id text not null references inspection_tasks(id) on delete cascade,
+  qr_code text not null,
+  algorithm_id text not null,
+  counter_date text not null,
+  consecutive_unqualified_count integer not null default 0,
+  last_result text,
+  last_alert_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists message_alert_counters_identity_idx
+  on message_alert_counters(task_id, qr_code, algorithm_id, counter_date);

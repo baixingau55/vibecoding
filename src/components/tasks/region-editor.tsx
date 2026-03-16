@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DeviceRef, RegionPoint, RegionShape } from "@/lib/types";
+import { readJsonResponse } from "@/lib/utils";
 
 const DEFAULT_STAGE_WIDTH = 560;
 const DEFAULT_STAGE_HEIGHT = 330;
@@ -16,9 +17,7 @@ type MediaRect = {
   height: number;
 };
 
-type PreviewState =
-  | { url: string; source: "latest-result" | "fallback-device"; imageTime?: string }
-  | { url: string; source: "local-fallback"; imageTime?: string };
+type PreviewState = { url: string; source: "latest-result"; imageTime?: string };
 
 function toCanvasPoint(point: RegionPoint, rect: MediaRect) {
   return {
@@ -127,18 +126,15 @@ export function RegionEditor({
         if (!response.ok) {
           throw new Error("Failed to load device preview.");
         }
-        return response.json() as Promise<PreviewState>;
+        return readJsonResponse<{ url?: string; imageTime?: string }>(response, "Failed to load device preview.");
       })
       .then((payload) => {
         if (!active) return;
-        setPreview(payload);
+        setPreview(payload.url ? { url: payload.url, source: "latest-result", imageTime: payload.imageTime } : null);
       })
       .catch(() => {
         if (!active) return;
-        setPreview({
-          url: device.previewImage,
-          source: "local-fallback"
-        });
+        setPreview(null);
         setPreviewError("未获取到实时预览，当前使用最近抓拍或默认底图。");
       })
       .finally(() => {
@@ -307,7 +303,9 @@ export function RegionEditor({
               });
             }}
           />
-        ) : null}
+        ) : (
+          <div className="region-stage-empty">鏆傛棤鐪熷疄棰勮搴曞浘</div>
+        )}
 
         <div
           className="region-stage-overlay"

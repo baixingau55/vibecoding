@@ -88,6 +88,8 @@ export interface MessageRule {
   enabled: boolean;
   triggerMode: "every_unqualified" | "continuous_unqualified";
   continuousCount?: number;
+  customMessageType?: string;
+  customMessageContent?: string;
 }
 
 export interface InspectionRule {
@@ -110,6 +112,7 @@ export interface InspectionTask {
   nextRunAt?: string;
   closedAt?: string;
   configErrorReason?: string;
+  completedRunCount?: number;
 }
 
 export interface InspectionRun {
@@ -225,6 +228,23 @@ export interface RankedTask {
   unqualifiedRate: number;
 }
 
+export interface TaskTrendSeries {
+  taskId: string;
+  taskName: string;
+  points: TrendPoint[];
+}
+
+export interface MessageAlertCounter {
+  id: string;
+  taskId: string;
+  qrCode: string;
+  algorithmId: string;
+  counterDate: string;
+  consecutiveUnqualifiedCount: number;
+  lastResult?: AlgorithmResult;
+  lastAlertAt?: string;
+}
+
 export interface AppSnapshot {
   serviceBalance: ServiceBalance;
   purchaseRecords: PurchaseRecord[];
@@ -238,6 +258,7 @@ export interface AppSnapshot {
   messages: MessageItem[];
   media: MediaAsset[];
   schedulerScans: SchedulerScan[];
+  messageAlertCounters?: MessageAlertCounter[];
 }
 
 export interface SchedulerScan {

@@ -7,6 +7,7 @@ import type {
   InspectionRun,
   InspectionTask,
   MediaAsset,
+  MessageAlertCounter,
   MessageItem,
   PurchaseRecord,
   SchedulerScan,
@@ -28,6 +29,9 @@ export function getMemoryStore() {
   }
 
   const store = global.__AI_XUNJIAN_STORE__;
+  if (!store.messageAlertCounters) {
+    store.messageAlertCounters = [];
+  }
 
   return {
     snapshot(_includeDevices = true) {
@@ -115,6 +119,32 @@ export function getMemoryStore() {
     addSchedulerScan(scan: SchedulerScan) {
       store.schedulerScans.unshift(clone(scan));
       store.schedulerScans = store.schedulerScans.slice(0, 100);
+    },
+    getMessageAlertCounter(taskId: string, qrCode: string, algorithmId: string, counterDate: string) {
+      return clone(
+        store.messageAlertCounters?.find(
+          (item) =>
+            item.taskId === taskId &&
+            item.qrCode === qrCode &&
+            item.algorithmId === algorithmId &&
+            item.counterDate === counterDate
+        ) ?? null
+      );
+    },
+    upsertMessageAlertCounter(counter: MessageAlertCounter) {
+      const index =
+        store.messageAlertCounters?.findIndex(
+          (item) =>
+            item.taskId === counter.taskId &&
+            item.qrCode === counter.qrCode &&
+            item.algorithmId === counter.algorithmId &&
+            item.counterDate === counter.counterDate
+        ) ?? -1;
+      if (index >= 0 && store.messageAlertCounters) {
+        store.messageAlertCounters[index] = clone(counter);
+      } else {
+        store.messageAlertCounters?.unshift(clone(counter));
+      }
     }
   };
 }

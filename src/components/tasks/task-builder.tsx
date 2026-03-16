@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PencilLine, Plus, Trash2, X } from "lucide-react";
 
@@ -130,9 +130,16 @@ export function TaskBuilder({
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleDraft, setScheduleDraft] = useState<InspectionSchedule>({ type: "time_point", startTime: "08:00", repeatDays });
   const [scheduleError, setScheduleError] = useState("");
+  const [editingScheduleIndex, setEditingScheduleIndex] = useState<number | null>(null);
 
   const [messageRule, setMessageRule] = useState<MessageRule>(
-    initialTask?.messageRule ?? { enabled: true, triggerMode: "every_unqualified", continuousCount: 3 }
+    initialTask?.messageRule ?? {
+      enabled: true,
+      triggerMode: "every_unqualified",
+      continuousCount: 3,
+      customMessageType: selectedAlgorithm?.name ?? "离岗检测",
+      customMessageContent: selectedAlgorithmRule.messageContent
+    }
   );
 
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
@@ -146,9 +153,19 @@ export function TaskBuilder({
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [selectedGroupName, setSelectedGroupName] = useState("全部分组");
 
+  const customMessageSectionRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     setAllDevices(devices);
   }, [devices]);
+
+  useEffect(() => {
+    setMessageRule((current) => ({
+      ...current,
+      customMessageType: current.customMessageType?.trim() ? current.customMessageType : selectedAlgorithm?.name ?? "离岗检测",
+      customMessageContent: current.customMessageContent?.trim() ? current.customMessageContent : selectedAlgorithmRule.messageContent
+    }));
+  }, [selectedAlgorithm?.name, selectedAlgorithmRule.messageContent]);
 
   const activeDevice = useMemo(
     () => selectedDevices.find((item) => deviceKey(item) === activeDeviceCode) ?? null,
@@ -168,6 +185,11 @@ export function TaskBuilder({
       return device.name.includes(keyword) || device.groupName.includes(keyword) || device.qrCode.includes(keyword);
     });
   }, [allDevices, deviceSearch, selectedGroupName]);
+
+  const dedupedAvailableDevices = useMemo(
+    () => Array.from(new Map(availableDevices.map((device) => [deviceKey(device), device] as const)).values()),
+    [availableDevices]
+  );
 
   async function ensureDevicesLoaded() {
     if (allDevices.length > 0 || devicesLoading) return;
@@ -201,6 +223,7 @@ export function TaskBuilder({
   }
 
   function openScheduleModal(type: InspectionSchedule["type"]) {
+    setEditingScheduleIndex(null);
     setScheduleDraft({
       type,
       startTime: type === "time_point" ? "08:00" : "09:00",
@@ -212,8 +235,18 @@ export function TaskBuilder({
     setScheduleModalOpen(true);
   }
 
+  function editSchedule(index: number) {
+    const current = schedules[index];
+    if (!current) return;
+    setEditingScheduleIndex(index);
+    setScheduleDraft({ ...current, repeatDays: [...current.repeatDays] });
+    setRepeatDays([...current.repeatDays]);
+    setScheduleError("");
+    setScheduleModalOpen(true);
+  }
+
   function commitSchedule() {
-    if (schedules.length >= 20) {
+    if (editingScheduleIndex === null && schedules.length >= 20) {
       setScheduleError("巡检时间最多支持 20 项。");
       return;
     }
@@ -224,7 +257,9 @@ export function TaskBuilder({
     }
 
     if (scheduleDraft.type === "time_point") {
-      const duplicate = schedules.some((item) => item.type === "time_point" && item.startTime === scheduleDraft.startTime);
+      const duplicate = schedules.some(
+        (item, index) => index !== editingScheduleIndex && item.type === "time_point" && item.startTime === scheduleDraft.startTime
+      );
       if (duplicate) {
         setScheduleError("时间点重复，请重新设置。");
         return;
@@ -252,7 +287,14 @@ export function TaskBuilder({
       }
     }
 
-    setSchedules((current) => [...current, { ...scheduleDraft, repeatDays }]);
+    setSchedules((current) => {
+      const nextSchedule = { ...scheduleDraft, repeatDays };
+      if (editingScheduleIndex === null) {
+        return [...current, nextSchedule];
+      }
+      return current.map((item, index) => (index === editingScheduleIndex ? nextSchedule : item));
+    });
+    setEditingScheduleIndex(null);
     setScheduleModalOpen(false);
   }
 
@@ -301,6 +343,10 @@ export function TaskBuilder({
     setSaving(true);
     setFeedback("");
 
+    const customMessageInputs = customMessageSectionRef.current?.querySelectorAll("input.ai-input");
+    const customMessageType = customMessageInputs?.[0] instanceof HTMLInputElement ? customMessageInputs[0].value.trim() : "";
+    const customMessageContent = customMessageInputs?.[1] instanceof HTMLInputElement ? customMessageInputs[1].value.trim() : "";
+
     const payload = {
       name,
       algorithmIds: [algorithmId],
@@ -308,7 +354,11 @@ export function TaskBuilder({
       devices: selectedDevices,
       schedules: schedules.map((item) => ({ ...item, repeatDays })),
       inspectionRule: { resultMode: inspectionRuleMode },
-      messageRule,
+      messageRule: {
+        ...messageRule,
+        customMessageType: customMessageType || messageRule.customMessageType?.trim() || selectedAlgorithm?.name || "离岗检测",
+        customMessageContent: customMessageContent || messageRule.customMessageContent?.trim() || selectedAlgorithmRule.messageContent
+      },
       regionsByQrCode
     };
 
@@ -426,6 +476,9 @@ export function TaskBuilder({
                     <div key={`${schedule.type}-${schedule.startTime}-${index}`} className="ai-schedule-item">
                       <span className="ai-chip ai-chip-active">{schedule.type === "time_point" ? "时间点" : "时间段"}</span>
                       <span>{scheduleSummary(schedule)}</span>
+                      <button type="button" className="ai-icon-button" onClick={() => editSchedule(index)}>
+                        <PencilLine size={14} strokeWidth={1.8} />
+                      </button>
                       <button type="button" className="ai-icon-button" onClick={() => removeSchedule(index)}>
                         <Trash2 size={14} strokeWidth={1.8} />
                       </button>
@@ -500,7 +553,7 @@ export function TaskBuilder({
               </div>
 
               <div className="ai-form-label">自定义消息内容</div>
-              <div className="ai-custom-message">
+              <div className="ai-custom-message" ref={customMessageSectionRef}>
                 <label className="ai-mini-form">
                   <span>消息类型</span>
                   <input className="ai-input" defaultValue={selectedAlgorithm?.name ?? "离岗检测"} />
@@ -578,7 +631,7 @@ export function TaskBuilder({
                   {activeDevice ? (
                     <>
                       <div className="ai-device-region-preview">
-                        <img src={activeDevice.previewImage} alt={activeDevice.name} />
+                        <div className="ai-device-region-preview-empty">暂无真实预览底图</div>
                       </div>
                       <div className="ai-device-region-copy">
                         <strong>检测区域</strong>
@@ -754,7 +807,7 @@ export function TaskBuilder({
                     {devicesLoading ? <div className="ai-device-select-empty">设备列表加载中...</div> : null}
                     {!devicesLoading && devicesLoadError ? <div className="ai-device-select-empty">{devicesLoadError}</div> : null}
                     {!devicesLoading && !devicesLoadError
-                      ? availableDevices.map((device) => {
+                      ? dedupedAvailableDevices.map((device) => {
                           const identity = deviceKey(device);
                           const checked = pendingDeviceCodes.includes(identity);
                           return (
