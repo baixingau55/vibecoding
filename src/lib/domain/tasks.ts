@@ -715,6 +715,32 @@ export async function getTaskRuntimeSummary(id: string) {
       ? await store.getTaskRunsData(id)
       : (await getTaskRuns(id));
   const latestRun = runs[0] ?? null;
+  const latestBatchRuns =
+    latestRun
+      ? runs.filter((run) => Math.abs(new Date(run.startedAt).getTime() - new Date(latestRun.startedAt).getTime()) <= 10_000)
+      : [];
+  const latestBatchStatus = (() => {
+    if (latestBatchRuns.length === 0) return latestRun?.status;
+    if (latestBatchRuns.some((run) => run.status === "running")) return "running";
+    const hasFailure = latestBatchRuns.some((run) => run.status === "failed" || run.status === "partial_success");
+    const hasCompletion = latestBatchRuns.some((run) => run.status === "completed" || run.status === "partial_success");
+    if (hasFailure && hasCompletion) return "partial_success";
+    if (hasFailure) return "failed";
+    return "completed";
+  })();
+  const latestBatchStartedAt =
+    latestBatchRuns.length > 0
+      ? [...latestBatchRuns]
+          .sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime())[0]
+          ?.startedAt
+      : latestRun?.startedAt;
+  const latestBatchCompletedAt =
+    latestBatchRuns.length > 0
+      ? [...latestBatchRuns]
+          .map((run) => run.completedAt)
+          .filter((value): value is string => Boolean(value))
+          .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
+      : latestRun?.completedAt;
   const staleThresholdMs = getStaleRunningRunMs(reconciledTask);
   const hasStaleRunningRun = runs.some(
     (run) => run.status === "running" && Date.now() - new Date(run.startedAt).getTime() >= staleThresholdMs
@@ -722,9 +748,9 @@ export async function getTaskRuntimeSummary(id: string) {
 
   return {
     task: reconciledTask,
-    latestRunStatus: latestRun?.status,
-    latestRunStartedAt: latestRun?.startedAt,
-    latestRunCompletedAt: latestRun?.completedAt,
+    latestRunStatus: latestBatchStatus,
+    latestRunStartedAt: latestBatchStartedAt,
+    latestRunCompletedAt: latestBatchCompletedAt,
     hasStaleRunningRun
   };
 }
