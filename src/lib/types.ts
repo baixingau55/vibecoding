@@ -11,6 +11,7 @@ export type TaskStatus =
   | "config_error";
 
 export type MediaKind = "image" | "video";
+export type ImageSource = "tplink_remote" | "supabase_storage" | "expired";
 
 export type RankingMetric = "unqualifiedRate" | "unqualifiedCount" | "messageCount";
 
@@ -124,6 +125,7 @@ export interface InspectionRun {
   refundedUnits: number;
   tpLinkTaskId?: string;
   profileId?: TpLinkProfileId;
+  tpLinkResultsDeletedAt?: string;
 }
 
 export interface InspectionResult {
@@ -139,6 +141,12 @@ export interface InspectionResult {
   result: AlgorithmResult;
   profileId?: TpLinkProfileId;
   qualifiedRate?: number;
+  imageStoragePath?: string;
+  imageSource?: ImageSource;
+  imageSyncedAt?: string;
+  imageExpiresAt?: string;
+  tpLinkTaskId?: string;
+  remoteImageUrl?: string;
 }
 
 export interface InspectionFailure {
@@ -170,6 +178,10 @@ export interface MessageItem {
   imageId?: string;
   videoTaskId?: string;
   profileId?: TpLinkProfileId;
+  imageStoragePath?: string;
+  imageSource?: ImageSource;
+  imageExpiresAt?: string;
+  remoteImageUrl?: string;
 }
 
 export interface MediaAsset {
@@ -179,6 +191,10 @@ export interface MediaAsset {
   taskId?: string;
   url: string;
   expiresAt: string;
+  storagePath?: string;
+  source?: ImageSource | "video_remote";
+  contentType?: string;
+  remoteUrl?: string;
 }
 
 export interface InspectionOverview {

@@ -99,7 +99,8 @@ create table if not exists inspection_runs (
   charged_units integer not null,
   refunded_units integer not null,
   tplink_task_id text,
-  profile_id text
+  profile_id text,
+  tplink_results_deleted_at timestamptz
 );
 
 create table if not exists inspection_results (
@@ -111,9 +112,14 @@ create table if not exists inspection_results (
   algorithm_id text not null,
   algorithm_version text not null,
   image_url text not null,
+  image_storage_path text,
+  image_source text,
+  image_synced_at timestamptz,
+  image_expires_at timestamptz,
   image_time timestamptz not null,
   result text not null,
-  profile_id text
+  profile_id text,
+  tplink_task_id text
 );
 
 create table if not exists inspection_failures (
@@ -141,6 +147,9 @@ create table if not exists messages (
   channel_id integer not null,
   algorithm_id text not null,
   image_url text,
+  image_storage_path text,
+  image_source text,
+  image_expires_at timestamptz,
   image_id text,
   video_task_id text,
   profile_id text,
@@ -153,6 +162,9 @@ create table if not exists message_media (
   task_id text references inspection_tasks(id) on delete cascade,
   kind text not null,
   url text not null,
+  storage_path text,
+  source text,
+  content_type text,
   expires_at timestamptz not null
 );
 
@@ -171,3 +183,16 @@ create table if not exists scheduler_scans (
   failed_count integer not null,
   error_summary text
 );
+
+alter table inspection_runs add column if not exists tplink_results_deleted_at timestamptz;
+alter table inspection_results add column if not exists image_storage_path text;
+alter table inspection_results add column if not exists image_source text;
+alter table inspection_results add column if not exists image_synced_at timestamptz;
+alter table inspection_results add column if not exists image_expires_at timestamptz;
+alter table inspection_results add column if not exists tplink_task_id text;
+alter table messages add column if not exists image_storage_path text;
+alter table messages add column if not exists image_source text;
+alter table messages add column if not exists image_expires_at timestamptz;
+alter table message_media add column if not exists storage_path text;
+alter table message_media add column if not exists source text;
+alter table message_media add column if not exists content_type text;

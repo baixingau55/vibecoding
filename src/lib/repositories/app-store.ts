@@ -1,5 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 
+import env from "@/lib/env";
 import { fetchTpLinkDeviceByQrCode, fetchTpLinkDevices } from "@/lib/tplink/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/client";
 import { slugId } from "@/lib/utils";
@@ -64,6 +65,44 @@ function isMissingColumnError(error: unknown) {
 
 function toDateString(value: string | null | undefined) {
   return value ?? undefined;
+}
+
+function isImageExpired(expiresAt: string | null | undefined) {
+  if (!expiresAt) return false;
+  const expires = Date.parse(expiresAt);
+  return !Number.isNaN(expires) && expires <= Date.now();
+}
+
+function resolveResultImageUrl(row: Record<string, any>) {
+  if (row.image_storage_path && !isImageExpired(row.image_expires_at)) {
+    return `${env.appBaseUrl}/api/results/${row.id}/image`;
+  }
+  if (row.image_source === "expired") {
+    return "";
+  }
+  return row.image_url ?? "";
+}
+
+function resolveMessageImageUrl(row: Record<string, any>) {
+  if (row.image_storage_path && !isImageExpired(row.image_expires_at)) {
+    return `${env.appBaseUrl}/api/messages/${row.id}/image`;
+  }
+  if (row.image_source === "expired") {
+    return undefined;
+  }
+  return row.image_url ?? undefined;
+}
+
+function resolveMediaUrl(row: Record<string, any>) {
+  if (row.kind === "image") {
+    if (row.storage_path && !isImageExpired(row.expires_at)) {
+      return `${env.appBaseUrl}/api/media/${row.id}`;
+    }
+    if (row.source === "expired") {
+      return "";
+    }
+  }
+  return row.url;
 }
 
 async function withReadCache<T>(key: string, loader: () => Promise<T>, ttlMs = READ_CACHE_TTL_MS): Promise<T> {
@@ -196,7 +235,8 @@ function mapRunRow(row: Record<string, any>): InspectionRun {
     chargedUnits: row.charged_units,
     refundedUnits: row.refunded_units,
     tpLinkTaskId: row.tplink_task_id ?? undefined,
-    profileId: row.profile_id ?? undefined
+    profileId: row.profile_id ?? undefined,
+    tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined
   };
 }
 
@@ -209,10 +249,16 @@ function mapResultRow(row: Record<string, any>): InspectionResult {
     channelId: row.channel_id,
     algorithmId: row.algorithm_id,
     algorithmVersion: row.algorithm_version,
-    imageUrl: row.image_url,
+    imageUrl: resolveResultImageUrl(row),
     imageTime: row.image_time,
     result: row.result,
-    profileId: row.profile_id ?? undefined
+    profileId: row.profile_id ?? undefined,
+    imageStoragePath: row.image_storage_path ?? undefined,
+    imageSource: row.image_source ?? undefined,
+    imageSyncedAt: row.image_synced_at ?? undefined,
+    imageExpiresAt: row.image_expires_at ?? undefined,
+    tpLinkTaskId: row.tplink_task_id ?? undefined,
+    remoteImageUrl: row.image_url ?? undefined
   };
 }
 
@@ -244,10 +290,14 @@ function mapMessageRow(row: Record<string, any>): MessageItem {
     channelId: row.channel_id,
     algorithmId: row.algorithm_id,
     createdAt: row.created_at,
-    imageUrl: row.image_url ?? undefined,
+    imageUrl: resolveMessageImageUrl(row),
     imageId: row.image_id ?? undefined,
     videoTaskId: row.video_task_id ?? undefined,
-    profileId: row.profile_id ?? undefined
+    profileId: row.profile_id ?? undefined,
+    imageStoragePath: row.image_storage_path ?? undefined,
+    imageSource: row.image_source ?? undefined,
+    imageExpiresAt: row.image_expires_at ?? undefined,
+    remoteImageUrl: row.image_url ?? undefined
   };
 }
 
@@ -257,8 +307,12 @@ function mapMediaRow(row: Record<string, any>): MediaAsset {
     kind: row.kind,
     messageId: row.message_id ?? undefined,
     taskId: row.task_id ?? undefined,
-    url: row.url,
-    expiresAt: row.expires_at
+    url: resolveMediaUrl(row),
+    expiresAt: row.expires_at,
+    storagePath: row.storage_path ?? undefined,
+    source: row.source ?? undefined,
+    contentType: row.content_type ?? undefined,
+    remoteUrl: row.url ?? undefined
   };
 }
 
@@ -605,7 +659,8 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
       chargedUnits: row.charged_units,
       refundedUnits: row.refunded_units,
       tpLinkTaskId: row.tplink_task_id ?? undefined,
-      profileId: row.profile_id ?? undefined
+      profileId: row.profile_id ?? undefined,
+      tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined
     })),
     results: (resultRes.data ?? []).map<InspectionResult>((row) => ({
       id: row.id,
@@ -615,10 +670,16 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
       channelId: row.channel_id,
       algorithmId: row.algorithm_id,
       algorithmVersion: row.algorithm_version,
-      imageUrl: row.image_url,
+      imageUrl: resolveResultImageUrl(row),
       imageTime: row.image_time,
       result: row.result,
-      profileId: row.profile_id ?? undefined
+      profileId: row.profile_id ?? undefined,
+      imageStoragePath: row.image_storage_path ?? undefined,
+      imageSource: row.image_source ?? undefined,
+      imageSyncedAt: row.image_synced_at ?? undefined,
+      imageExpiresAt: row.image_expires_at ?? undefined,
+      tpLinkTaskId: row.tplink_task_id ?? undefined,
+      remoteImageUrl: row.image_url ?? undefined
     })),
     failures: (failureRes.data ?? []).map<InspectionFailure>((row) => ({
       id: row.id,
@@ -644,18 +705,26 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
       channelId: row.channel_id,
       algorithmId: row.algorithm_id,
       createdAt: row.created_at,
-      imageUrl: row.image_url ?? undefined,
+      imageUrl: resolveMessageImageUrl(row),
       imageId: row.image_id ?? undefined,
       videoTaskId: row.video_task_id ?? undefined,
-      profileId: row.profile_id ?? undefined
+      profileId: row.profile_id ?? undefined,
+      imageStoragePath: row.image_storage_path ?? undefined,
+      imageSource: row.image_source ?? undefined,
+      imageExpiresAt: row.image_expires_at ?? undefined,
+      remoteImageUrl: row.image_url ?? undefined
     })),
     media: (mediaRes.data ?? []).map<MediaAsset>((row) => ({
       id: row.id,
       kind: row.kind,
       messageId: row.message_id ?? undefined,
       taskId: row.task_id ?? undefined,
-      url: row.url,
-      expiresAt: row.expires_at
+      url: resolveMediaUrl(row),
+      expiresAt: row.expires_at,
+      storagePath: row.storage_path ?? undefined,
+      source: row.source ?? undefined,
+      contentType: row.content_type ?? undefined,
+      remoteUrl: row.url ?? undefined
     })),
     schedulerScans: (schedulerScanRes.data ?? []).map<SchedulerScan>((row) => ({
       id: row.id,
@@ -908,14 +977,14 @@ export async function getAppStore() {
       return withReadCache("tasks:preview", async () => {
         const { data, error } = await client
           .from("inspection_results")
-          .select("task_id,qr_code,image_url,image_time")
+          .select("id,task_id,qr_code,image_url,image_time,image_storage_path,image_source,image_expires_at")
           .not("image_url", "is", null)
           .order("image_time", { ascending: false });
         if (error) throw error;
         return (data ?? []).map((row) => ({
           taskId: row.task_id,
           qrCode: row.qr_code,
-          imageUrl: row.image_url,
+          imageUrl: resolveResultImageUrl(row),
           imageTime: row.image_time
         }));
       });
@@ -1071,7 +1140,8 @@ export async function getAppStore() {
         charged_units: run.chargedUnits,
         refunded_units: run.refundedUnits,
         tplink_task_id: run.tpLinkTaskId ?? null,
-        profile_id: run.profileId ?? null
+        profile_id: run.profileId ?? null,
+        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null
       });
       if (error && isMissingColumnError(error)) {
         ({ error } = await client.from("inspection_runs").insert({
@@ -1082,11 +1152,11 @@ export async function getAppStore() {
           status: run.status,
           total_checks: run.totalChecks,
           successful_checks: run.successfulChecks,
-          failed_checks: run.failedChecks,
-          charged_units: run.chargedUnits,
-          refunded_units: run.refundedUnits,
-          tplink_task_id: run.tpLinkTaskId ?? null
-        }));
+            failed_checks: run.failedChecks,
+            charged_units: run.chargedUnits,
+            refunded_units: run.refundedUnits,
+            tplink_task_id: run.tpLinkTaskId ?? null
+          }));
       }
       if (error) throw error;
     },
@@ -1099,11 +1169,12 @@ export async function getAppStore() {
           status: run.status,
           total_checks: run.totalChecks,
           successful_checks: run.successfulChecks,
-          failed_checks: run.failedChecks,
-          charged_units: run.chargedUnits,
-          refunded_units: run.refundedUnits,
-          tplink_task_id: run.tpLinkTaskId ?? null,
-          profile_id: run.profileId ?? null
+        failed_checks: run.failedChecks,
+        charged_units: run.chargedUnits,
+        refunded_units: run.refundedUnits,
+        tplink_task_id: run.tpLinkTaskId ?? null,
+        profile_id: run.profileId ?? null,
+        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null
         })
         .eq("id", run.id);
       if (error && isMissingColumnError(error)) {
@@ -1134,17 +1205,55 @@ export async function getAppStore() {
           channel_id: item.channelId,
           algorithm_id: item.algorithmId,
           algorithm_version: item.algorithmVersion,
-          image_url: item.imageUrl,
+          image_url: item.remoteImageUrl ?? item.imageUrl,
           image_time: item.imageTime,
           result: item.result,
-          profile_id: item.profileId ?? null
+          profile_id: item.profileId ?? null,
+          image_storage_path: item.imageStoragePath ?? null,
+          image_source: item.imageSource ?? null,
+          image_synced_at: item.imageSyncedAt ?? null,
+          image_expires_at: item.imageExpiresAt ?? null,
+          tplink_task_id: item.tpLinkTaskId ?? null
         }));
       let { error } = await client.from("inspection_results").upsert(resultRows, { onConflict: "id" });
       if (error && isMissingColumnError(error)) {
         ({ error } = await client.from("inspection_results").upsert(
-          resultRows.map(({ profile_id: _profileId, ...legacyRow }) => legacyRow),
+          resultRows.map(
+            ({
+              profile_id: _profileId,
+              image_storage_path: _imageStoragePath,
+              image_source: _imageSource,
+              image_synced_at: _imageSyncedAt,
+              image_expires_at: _imageExpiresAt,
+              tplink_task_id: _tplinkTaskId,
+              ...legacyRow
+            }) => legacyRow
+          ),
           { onConflict: "id" }
         ));
+      }
+      if (error) throw error;
+    },
+    async updateResult(result: InspectionResult) {
+      invalidateReadCache();
+      const row = {
+        image_url: result.remoteImageUrl ?? result.imageUrl,
+        image_storage_path: result.imageStoragePath ?? null,
+        image_source: result.imageSource ?? null,
+        image_synced_at: result.imageSyncedAt ?? null,
+        image_expires_at: result.imageExpiresAt ?? null,
+        profile_id: result.profileId ?? null,
+        tplink_task_id: result.tpLinkTaskId ?? null
+      };
+      let { error } = await client.from("inspection_results").update(row).eq("id", result.id);
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client
+          .from("inspection_results")
+          .update({
+            image_url: result.remoteImageUrl ?? result.imageUrl,
+            profile_id: result.profileId ?? null
+          })
+          .eq("id", result.id));
       }
       if (error) throw error;
     },
@@ -1183,15 +1292,27 @@ export async function getAppStore() {
           channel_id: item.channelId,
           algorithm_id: item.algorithmId,
           created_at: item.createdAt,
-          image_url: item.imageUrl ?? null,
+          image_url: item.remoteImageUrl ?? item.imageUrl ?? null,
           image_id: item.imageId ?? null,
           video_task_id: item.videoTaskId ?? null,
-          profile_id: item.profileId ?? null
+          profile_id: item.profileId ?? null,
+          image_storage_path: item.imageStoragePath ?? null,
+          image_source: item.imageSource ?? null,
+          image_expires_at: item.imageExpiresAt ?? null
         }));
       let { error } = await client.from("messages").upsert(messageRows, { onConflict: "id" });
       if (error && isMissingColumnError(error)) {
         ({ error } = await client.from("messages").upsert(
-          messageRows.map(({ result_id: _resultId, profile_id: _profileId, ...legacyRow }) => legacyRow),
+          messageRows.map(
+            ({
+              result_id: _resultId,
+              profile_id: _profileId,
+              image_storage_path: _imageStoragePath,
+              image_source: _imageSource,
+              image_expires_at: _imageExpiresAt,
+              ...legacyRow
+            }) => legacyRow
+          ),
           { onConflict: "id" }
         ));
       }
@@ -1207,10 +1328,13 @@ export async function getAppStore() {
           title: message.title,
           description: message.description,
           result: message.result,
-          image_url: message.imageUrl ?? null,
+          image_url: message.remoteImageUrl ?? message.imageUrl ?? null,
           image_id: message.imageId ?? null,
           video_task_id: message.videoTaskId ?? null,
-          profile_id: message.profileId ?? null
+          profile_id: message.profileId ?? null,
+          image_storage_path: message.imageStoragePath ?? null,
+          image_source: message.imageSource ?? null,
+          image_expires_at: message.imageExpiresAt ?? null
         })
         .eq("id", message.id);
       if (error && isMissingColumnError(error)) {
@@ -1221,7 +1345,7 @@ export async function getAppStore() {
             title: message.title,
             description: message.description,
             result: message.result,
-            image_url: message.imageUrl ?? null,
+            image_url: message.remoteImageUrl ?? message.imageUrl ?? null,
             image_id: message.imageId ?? null,
             video_task_id: message.videoTaskId ?? null
           })
@@ -1231,17 +1355,56 @@ export async function getAppStore() {
     },
     async addMedia(asset: MediaAsset) {
       invalidateReadCache();
-      const { error } = await client.from("message_media").upsert(
+      let { error } = await client.from("message_media").upsert(
         {
           id: asset.id,
           message_id: asset.messageId ?? null,
           task_id: asset.taskId ?? null,
           kind: asset.kind,
-          url: asset.url,
-          expires_at: asset.expiresAt
+          url: asset.remoteUrl ?? asset.url,
+          expires_at: asset.expiresAt,
+          storage_path: asset.storagePath ?? null,
+          source: asset.source ?? null,
+          content_type: asset.contentType ?? null
         },
         { onConflict: "id" }
       );
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client.from("message_media").upsert(
+          {
+            id: asset.id,
+            message_id: asset.messageId ?? null,
+            task_id: asset.taskId ?? null,
+            kind: asset.kind,
+            url: asset.remoteUrl ?? asset.url,
+            expires_at: asset.expiresAt
+          },
+          { onConflict: "id" }
+        ));
+      }
+      if (error) throw error;
+    },
+    async updateMedia(asset: MediaAsset) {
+      invalidateReadCache();
+      let { error } = await client
+        .from("message_media")
+        .update({
+          url: asset.remoteUrl ?? asset.url,
+          expires_at: asset.expiresAt,
+          storage_path: asset.storagePath ?? null,
+          source: asset.source ?? null,
+          content_type: asset.contentType ?? null
+        })
+        .eq("id", asset.id);
+      if (error && isMissingColumnError(error)) {
+        ({ error } = await client
+          .from("message_media")
+          .update({
+            url: asset.remoteUrl ?? asset.url,
+            expires_at: asset.expiresAt
+          })
+          .eq("id", asset.id));
+      }
       if (error) throw error;
     },
     async addSchedulerScan(scan: SchedulerScan) {
@@ -1260,4 +1423,8 @@ export async function getAppStore() {
       if (error && !isMissingTableError(error) && !isMissingColumnError(error)) throw error;
     }
   };
+}
+
+export function invalidateRepositoryReadCache() {
+  invalidateReadCache();
 }

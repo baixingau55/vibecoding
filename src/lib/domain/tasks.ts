@@ -1,6 +1,7 @@
 import env from "@/lib/env";
 import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
+import { persistImagesForRun } from "@/lib/domain/image-retention";
 import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
 import { getAppSnapshot } from "@/lib/domain/store";
 import { getAppStore } from "@/lib/repositories/app-store";
@@ -254,7 +255,9 @@ function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: In
     imageUrl: result.imageUrl,
     imageId: result.imageUrl ? slugId("image") : undefined,
     videoTaskId: undefined,
-    profileId: result.profileId
+    profileId: result.profileId,
+    imageSource: result.imageUrl ? "tplink_remote" : undefined,
+    remoteImageUrl: result.remoteImageUrl ?? result.imageUrl
   };
 }
 
@@ -1275,7 +1278,10 @@ export async function handleTpLinkTaskCallback(payload: {
       imageUrl: item.imageUrl?.trim() ?? "",
       imageTime: parseTpLinkTime(item.imageTime),
       result: item.algorithmResult,
-      profileId: run.profileId
+      profileId: run.profileId,
+      imageSource: item.imageUrl?.trim() ? "tplink_remote" : undefined,
+      tpLinkTaskId: run.tpLinkTaskId,
+      remoteImageUrl: item.imageUrl?.trim() ?? ""
     };
     results.push(result);
 
@@ -1289,7 +1295,9 @@ export async function handleTpLinkTaskCallback(payload: {
           messageId: message.id,
           taskId: task.id,
           url: message.imageUrl,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+          source: "tplink_remote",
+          remoteUrl: message.imageUrl
         });
       }
     }
@@ -1336,5 +1344,15 @@ export async function handleTpLinkTaskCallback(payload: {
   });
   revalidateTaskReadModels();
 
-  return { ok: true, resultCount: results.length, failureCount: failures.length, messageCount: messages.length };
+  let imageSync: { synced: string[]; failed: Array<{ resultId: string; error: string }> } | undefined;
+  try {
+    imageSync = await persistImagesForRun(run.id);
+  } catch (error) {
+    imageSync = {
+      synced: [],
+      failed: [{ resultId: "run", error: error instanceof Error ? error.message : "Unknown image sync error" }]
+    };
+  }
+
+  return { ok: true, resultCount: results.length, failureCount: failures.length, messageCount: messages.length, imageSync };
 }

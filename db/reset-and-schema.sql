@@ -116,7 +116,8 @@ create table if not exists inspection_runs (
   charged_units integer not null,
   refunded_units integer not null,
   tplink_task_id text,
-  profile_id text
+  profile_id text,
+  tplink_results_deleted_at timestamptz
 );
 
 create table if not exists inspection_results (
@@ -128,9 +129,14 @@ create table if not exists inspection_results (
   algorithm_id text not null,
   algorithm_version text not null,
   image_url text not null,
+  image_storage_path text,
+  image_source text,
+  image_synced_at timestamptz,
+  image_expires_at timestamptz,
   image_time timestamptz not null,
   result text not null,
-  profile_id text
+  profile_id text,
+  tplink_task_id text
 );
 
 create table if not exists inspection_failures (
@@ -158,6 +164,9 @@ create table if not exists messages (
   channel_id integer not null,
   algorithm_id text not null,
   image_url text,
+  image_storage_path text,
+  image_source text,
+  image_expires_at timestamptz,
   image_id text,
   video_task_id text,
   profile_id text,
@@ -170,6 +179,9 @@ create table if not exists message_media (
   task_id text references inspection_tasks(id) on delete cascade,
   kind text not null,
   url text not null,
+  storage_path text,
+  source text,
+  content_type text,
   expires_at timestamptz not null
 );
 

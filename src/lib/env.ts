@@ -40,6 +40,7 @@ const env = {
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseInspectionMediaBucket: process.env.SUPABASE_INSPECTION_MEDIA_BUCKET ?? "inspection-media",
   appBaseUrl: process.env.APP_BASE_URL ?? "http://localhost:3000",
   tpLinkMessageSignSecret: process.env.TP_LINK_MESSAGE_SIGN_SECRET ?? "",
   internalAdminToken: process.env.INTERNAL_ADMIN_TOKEN ?? ""

@@ -81,6 +81,14 @@ export function getMemoryStore() {
     addResults(nextResults: InspectionResult[]) {
       store.results.unshift(...clone(nextResults));
     },
+    updateResult(result: InspectionResult) {
+      const index = store.results.findIndex((item) => item.id === result.id);
+      if (index >= 0) {
+        store.results[index] = clone(result);
+      } else {
+        store.results.unshift(clone(result));
+      }
+    },
     addFailures(nextFailures: InspectionFailure[]) {
       store.failures.unshift(...clone(nextFailures));
     },
@@ -95,6 +103,14 @@ export function getMemoryStore() {
     },
     addMedia(asset: MediaAsset) {
       store.media.unshift(clone(asset));
+    },
+    updateMedia(asset: MediaAsset) {
+      const index = store.media.findIndex((item) => item.id === asset.id);
+      if (index >= 0) {
+        store.media[index] = clone(asset);
+      } else {
+        store.media.unshift(clone(asset));
+      }
     },
     addSchedulerScan(scan: SchedulerScan) {
       store.schedulerScans.unshift(clone(scan));

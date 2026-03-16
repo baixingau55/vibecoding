@@ -370,7 +370,9 @@ export function MessageCenter({
                 <div className="ai-drawer-media">
                   <img src={imageMedia?.url ?? selectedMessage.imageUrl!} alt={selectedMessage.title} className="ai-drawer-media-native" />
                 </div>
-              ) : null}
+              ) : (
+                <div className="ai-video-empty">{selectedMessage.imageSource === "expired" ? "图片已过期/已清理" : "当前暂无可查看图片"}</div>
+              )}
 
               <div className="ai-replay-panel">
                 {replayLoading ? (

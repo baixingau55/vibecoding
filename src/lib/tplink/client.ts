@@ -407,6 +407,24 @@ export async function getTpLinkInspectionTaskResult(taskId: string, profileId?: 
   return response;
 }
 
+export async function deleteTpLinkInspectionTaskResults(taskIdList: string[], profileId?: TpLinkProfileId) {
+  const normalizedTaskIdList = Array.from(new Set(taskIdList.map((item) => item.trim()).filter(Boolean))).slice(0, 20);
+  if (normalizedTaskIdList.length === 0) {
+    return { error_code: 0, result: { successCount: 0 } };
+  }
+
+  return tpLinkPost<{
+    error_code: number;
+    result?: { successCount?: number };
+  }>(
+    "/openapi/aiInspection/v1/batchDeleteAiTaskResult",
+    {
+      taskIdList: normalizedTaskIdList
+    },
+    profileId
+  );
+}
+
 export async function submitTpLinkCaptureVideoTask(
   payload: {
     qrCode: string;

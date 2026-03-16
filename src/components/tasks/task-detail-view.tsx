@@ -526,7 +526,11 @@ export function TaskDetailView({
                   {replayLoading ? "正在拉取回放..." : "查看回放"}
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="ai-message-drawer-section ai-message-drawer-result">
+                <div className="ai-video-empty">{selectedResult.imageSource === "expired" ? "图片已过期/已清理" : "当前暂无可查看抓拍图"}</div>
+              </div>
+            )}
           </aside>
         </div>
       ) : null}

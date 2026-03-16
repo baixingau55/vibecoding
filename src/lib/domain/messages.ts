@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 
 import { CACHE_TAGS, revalidateMessageReadModels } from "@/lib/domain/cache-tags";
+import { persistMessageImage } from "@/lib/domain/image-retention";
 import { getAppStore } from "@/lib/repositories/app-store";
 import { getAppSnapshot } from "@/lib/domain/store";
 import type { MediaAsset, MessageItem } from "@/lib/types";
@@ -166,7 +167,9 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
       imageUrl,
       imageId,
       videoTaskId: videoId,
-      profileId
+      profileId,
+      imageSource: imageUrl ? "tplink_remote" : undefined,
+      remoteImageUrl: imageUrl
     });
 
     if (imageUrl && imageId) {
@@ -176,7 +179,9 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
         messageId,
         taskId,
         url: imageUrl,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+        source: "tplink_remote",
+        remoteUrl: imageUrl
       });
     }
 
@@ -187,7 +192,9 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
         messageId,
         taskId,
         url: videoUrl,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60).toISOString()
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
+        source: "video_remote",
+        remoteUrl: videoUrl
       });
     }
   }
@@ -201,5 +208,17 @@ export async function handleTpLinkMessageCallback(payload: unknown) {
     await store.addMedia(asset);
   }
 
-  return { ok: true, messageCount: nextMessages.length, mediaCount: nextMedia.length };
+  const imageSyncFailures: Array<{ messageId: string; error: string }> = [];
+  for (const message of nextMessages.filter((item) => item.imageUrl)) {
+    try {
+      await persistMessageImage(message.id);
+    } catch (error) {
+      imageSyncFailures.push({
+        messageId: message.id,
+        error: error instanceof Error ? error.message : "Unknown message image sync error"
+      });
+    }
+  }
+
+  return { ok: true, messageCount: nextMessages.length, mediaCount: nextMedia.length, imageSyncFailures };
 }
