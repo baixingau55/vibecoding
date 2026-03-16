@@ -325,24 +325,28 @@ export async function getImageBackfillStatus(limit = 20) {
   const pendingResults = results.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
   const localizedMessages = messages.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
   const pendingMessages = messages.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
-  const groupedRuns = snapshot.runs
-    .filter((run) => run.tpLinkTaskId)
-    .map((run) => {
-      const runResults = results.filter((item) => item.runId === run.id);
-      const localizedCount = runResults.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage").length;
-      const pendingCount = runResults.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage").length;
-      return {
-        runId: run.id,
-        taskId: run.taskId,
-        profileId: run.profileId,
-        tpLinkTaskId: run.tpLinkTaskId,
-        totalImageCount: runResults.length,
-        localizedCount,
-        pendingCount,
-        deletedAt: run.tpLinkResultsDeletedAt,
-        deleteError: run.tpLinkResultsDeleteError
-      };
-    })
+  const groupedRuns = (
+    await Promise.all(
+      snapshot.runs.filter((run) => run.tpLinkTaskId).map(async (run) => {
+        const runResults = results.filter((item) => item.runId === run.id);
+        const localizedFlags = await Promise.all(runResults.map((item) => isResultLocalized(item)));
+        const localizedCount = localizedFlags.filter(Boolean).length;
+        const pendingCount = Math.max(0, runResults.length - localizedCount);
+        return {
+          runId: run.id,
+          taskId: run.taskId,
+          profileId: run.profileId,
+          tpLinkTaskId: run.tpLinkTaskId,
+          totalImageCount: runResults.length,
+          localizedCount,
+          pendingCount,
+          readyToDelete: runResults.length > 0 && pendingCount === 0,
+          deletedAt: run.tpLinkResultsDeletedAt,
+          deleteError: run.tpLinkResultsDeleteError
+        };
+      })
+    )
+  )
     .sort((left, right) => {
       const leftDeletedAt = left.deletedAt ? Date.parse(left.deletedAt) : 0;
       const rightDeletedAt = right.deletedAt ? Date.parse(right.deletedAt) : 0;
@@ -368,6 +372,48 @@ export async function getImageBackfillStatus(limit = 20) {
       expired: messages.filter((item) => item.imageSource === "expired").length
     },
     runs: groupedRuns.slice(0, Math.max(1, limit))
+  };
+}
+
+export async function deleteLocalizedTpLinkResults(limit = 20) {
+  const snapshot = await getFreshSnapshot();
+  const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId && run.profileId).slice(0, Math.max(1, limit));
+  const deleted: Array<{ runId: string; taskId: string; tpLinkTaskId: string; profileId: string }> = [];
+  const skipped: Array<{ runId: string; reason: string }> = [];
+  const failed: Array<{ runId: string; tpLinkTaskId?: string; error: string }> = [];
+
+  for (const run of candidateRuns) {
+    try {
+      const deletedThisRun = await maybeDeleteTpLinkImagesForRun(run);
+      if (deletedThisRun) {
+        deleted.push({
+          runId: run.id,
+          taskId: run.taskId,
+          tpLinkTaskId: run.tpLinkTaskId!,
+          profileId: run.profileId!
+        });
+      } else {
+        skipped.push({
+          runId: run.id,
+          reason: "Run is not fully localized yet."
+        });
+      }
+    } catch (error) {
+      failed.push({
+        runId: run.id,
+        tpLinkTaskId: run.tpLinkTaskId,
+        error: error instanceof Error ? error.message : "Unknown TP-LINK delete error"
+      });
+    }
+  }
+
+  return {
+    deletedCount: deleted.length,
+    skippedCount: skipped.length,
+    failedCount: failed.length,
+    deleted,
+    skipped,
+    failed
   };
 }
 
