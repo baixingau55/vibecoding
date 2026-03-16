@@ -19,14 +19,14 @@ import {
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { href: "/tasks/select", label: "AI巡检算法", icon: Menu, matchers: ["/tasks/select", "/tasks/choose"] },
-  { href: "/tasks", label: "巡检任务", icon: LayoutList, matchers: ["/tasks"] },
-  { href: "/analytics", label: "巡检数据", icon: LineChart, matchers: ["/analytics"] },
-  { href: "/messages", label: "消息中心", icon: Bell, matchers: ["/messages"] }
+  { href: "/tasks/select", label: "AI巡检算法", icon: Menu, matchers: ["/tasks/select", "/tasks/choose"], allowChildren: true },
+  { href: "/tasks", label: "巡检任务", icon: LayoutList, matchers: ["/tasks"], allowChildren: false },
+  { href: "/analytics", label: "巡检数据", icon: LineChart, matchers: ["/analytics"], allowChildren: true },
+  { href: "/messages", label: "消息中心", icon: Bell, matchers: ["/messages"], allowChildren: true }
 ];
 
-function matches(pathname: string, href: string, matchers: string[] = [href]) {
-  return matchers.some((matcher) => pathname === matcher || pathname.startsWith(`${matcher}/`));
+function matches(pathname: string, href: string, matchers: string[] = [href], allowChildren = true) {
+  return matchers.some((matcher) => pathname === matcher || (allowChildren && pathname.startsWith(`${matcher}/`)));
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -104,7 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <nav className="tplink-sidebar-nav" aria-label="AI巡检导航">
               {navigation.map((item) => {
                 const Icon = item.icon;
-                const active = matches(pathname, item.href, item.matchers);
+                const active = matches(pathname, item.href, item.matchers, item.allowChildren);
                 return (
                   <Link key={item.href} href={item.href} className={cn("tplink-sidebar-item", active && "tplink-sidebar-item-active")}>
                     <span className="tplink-sidebar-icon">
