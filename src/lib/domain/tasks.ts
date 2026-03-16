@@ -1204,16 +1204,39 @@ export async function refreshTaskResults(taskId: string) {
   const callbackResults = [];
   for (const targetRun of targetRuns) {
     const response = await getTpLinkInspectionTaskResult(targetRun.tpLinkTaskId!, targetRun.profileId);
-    const resultList =
-      response.result?.taskResult?.map((item) => ({
-        qrCode: item.qrCode,
-        mac: item.mac,
-        channelId: item.channelId,
-        imageUrl: item.imageUrl,
-        imageTime: item.imageTime,
-        algorithmId: item.algorithmId,
-        algorithmResult: item.algorithmResult
-      })) ?? [];
+    const resultList = [
+      ...(
+        response.result?.taskResult?.map((item) => ({
+          qrCode: item.qrCode,
+          mac: item.mac,
+          channelId: item.channelId,
+          imageUrl: item.imageUrl,
+          imageTime: item.imageTime,
+          algorithmId: item.algorithmId,
+          algorithmResult: item.algorithmResult
+        })) ?? []
+      ),
+      ...(
+        response.result?.failList?.map((item) => ({
+          qrCode: item.qrCode,
+          mac: item.mac,
+          channelId: item.channelId,
+          algorithmId: details.task.algorithmIds[0] ?? "",
+          algorithmResult: "UNAVAILABLE" as const,
+          error_code: item.error_code
+        })) ?? []
+      )
+    ];
+
+    if (resultList.length === 0) {
+      callbackResults.push({
+        ok: true,
+        pending: true,
+        taskStatus: response.result?.taskStatus,
+        reason: "TP-LINK task result is not ready yet."
+      });
+      continue;
+    }
 
     callbackResults.push(await handleTpLinkTaskCallback({ taskId: targetRun.tpLinkTaskId!, resultList }));
   }
@@ -1244,6 +1267,10 @@ export async function handleTpLinkTaskCallback(payload: {
   const task = snapshot.tasks.find((item) => item.id === run.taskId);
   if (!task) {
     return { ok: false, reason: "Task not found for callback run." };
+  }
+
+  if (!payload.resultList || payload.resultList.length === 0) {
+    return { ok: true, pending: true, reason: "No callback items received yet." };
   }
 
   const results: InspectionResult[] = [];
