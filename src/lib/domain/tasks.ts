@@ -454,6 +454,36 @@ function buildProfileSupportFailures(task: InspectionTask, runId: string, profil
   );
 }
 
+function buildExecutionFailures(
+  task: InspectionTask,
+  runId: string,
+  devices: InspectionTask["devices"],
+  algorithmIds: string[],
+  errorCode: number,
+  message: string
+) {
+  return devices.flatMap((device) =>
+    algorithmIds.map<InspectionFailure>((algorithmId) => ({
+      id: slugId("failure"),
+      runId,
+      taskId: task.id,
+      qrCode: device.qrCode,
+      channelId: device.channelId,
+      algorithmId,
+      errorCode,
+      message
+    }))
+  );
+}
+
+function explainTpLinkExecutionError(errorCode: number) {
+  if (errorCode === -510851) {
+    return "TP-LINK AI图像分析次数受限";
+  }
+
+  return `TP-LINK error_code=${errorCode}`;
+}
+
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -953,8 +983,10 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
   }
 
   const resolvedDevices = await resolveTaskDevicesForExecution(task);
+  const onlineDevices = resolvedDevices.filter((device) => device.status === "online");
+  const offlineDevices = resolvedDevices.filter((device) => device.status !== "online");
   const algorithms = await getAlgorithms();
-  const { executableGroups, unsupportedGroups } = computeExecutableGroups(task, resolvedDevices, algorithms);
+  const { executableGroups, unsupportedGroups } = computeExecutableGroups(task, onlineDevices, algorithms);
   const executableDevices = executableGroups.flatMap((group) => group.devices);
   const chargeUnitsCount = executableDevices.length * task.algorithmIds.length;
   const balance = await getServiceBalance();
@@ -965,7 +997,7 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
 
   if (process.env.VITEST || process.env.NODE_ENV === "test" || !env.tpLinkAk || !env.tpLinkSk) {
     return simulateTaskExecution(
-      { ...task, devices: executableDevices.length > 0 ? executableDevices : resolvedDevices },
+      { ...task, devices: executableDevices.length > 0 ? executableDevices : onlineDevices },
       chargeUnitsCount,
       nextRunAtAfterDispatch
     );
@@ -975,10 +1007,13 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
     await chargeUnits(task.id, chargeUnitsCount);
   }
 
+  let refundedUnitsSoFar = 0;
   try {
     const store = await getAppStore();
     const runs: InspectionRun[] = [];
-    const unsupportedFailures: InspectionFailure[] = [];
+    const upfrontFailures: InspectionFailure[] = [];
+    const executionFailures: InspectionFailure[] = [];
+    const startedRuns: InspectionRun[] = [];
 
     for (const unsupportedGroup of unsupportedGroups) {
       const failedRun: InspectionRun = {
@@ -997,7 +1032,7 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
 
       await store.addRun(failedRun);
       runs.push(failedRun);
-      unsupportedFailures.push(
+      upfrontFailures.push(
         ...buildProfileSupportFailures(
           task,
           failedRun.id,
@@ -1008,79 +1043,141 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
       );
     }
 
-    if (unsupportedFailures.length > 0) {
-      await store.addFailures(unsupportedFailures);
+    if (offlineDevices.length > 0) {
+      const groupedOfflineDevices = groupDevicesByProfile(offlineDevices);
+      for (const [profileId, profileDevices] of groupedOfflineDevices) {
+        const failedRun: InspectionRun = {
+          id: slugId("run"),
+          taskId: task.id,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          status: "failed",
+          totalChecks: 0,
+          successfulChecks: 0,
+          failedChecks: profileDevices.length * task.algorithmIds.length,
+          chargedUnits: 0,
+          refundedUnits: 0,
+          profileId
+        };
+
+        await store.addRun(failedRun);
+        runs.push(failedRun);
+        upfrontFailures.push(
+          ...buildExecutionFailures(task, failedRun.id, profileDevices, task.algorithmIds, -40002, "设备离线，已跳过本轮巡检。")
+        );
+      }
+    }
+
+    if (upfrontFailures.length > 0) {
+      await store.addFailures(upfrontFailures);
     }
 
     for (const { profileId, devices: profileDevices } of executableGroups) {
-      const versionResponse = await setTpLinkAlgorithmVersions(
-        {
-          algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
-            algorithmId,
-            algorithmVersion
-          }))
-        },
-        profileId
-      );
+      const profileChargeUnits = profileDevices.length * task.algorithmIds.length;
 
-      if (versionResponse.error_code !== 0) {
-        throw new Error(`TP-LINK algorithm version setup failed: profile=${profileId}, error_code=${versionResponse.error_code}`);
+      try {
+        const versionResponse = await setTpLinkAlgorithmVersions(
+          {
+            algorithmInfoList: Object.entries(task.algorithmVersions).map(([algorithmId, algorithmVersion]) => ({
+              algorithmId,
+              algorithmVersion
+            }))
+          },
+          profileId
+        );
+
+        if (versionResponse.error_code !== 0) {
+          throw new Error(`TP-LINK algorithm version setup failed: profile=${profileId}, error_code=${versionResponse.error_code}`);
+        }
+
+        if ((versionResponse.result?.failList?.length ?? 0) > 0) {
+          const failSummary = versionResponse.result?.failList
+            ?.map((item) => `${item.algorithmId}@${item.algorithmVersion}: ${item.error_code}`)
+            .join("; ");
+          throw new Error(`TP-LINK algorithm version setup partially failed: profile=${profileId}; ${failSummary}`);
+        }
+
+        const response = await startTpLinkInspectionTask(
+          {
+            callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
+            algorithmIdList: task.algorithmIds,
+            type: 1,
+            devList: buildTpLinkDevList({ ...task, devices: profileDevices })
+          },
+          profileId
+        );
+
+        if (response.error_code !== 0) {
+          const explanation = explainTpLinkExecutionError(response.error_code);
+          throw new Error(`TP-LINK inspection start failed: profile=${profileId}, error_code=${response.error_code}, reason=${explanation}`);
+        }
+
+        if (!response.result?.taskId) {
+          throw new Error(`TP-LINK did not return a taskId for profile=${profileId}: ${JSON.stringify(response)}`);
+        }
+
+        const run: InspectionRun = {
+          id: slugId("run"),
+          taskId: task.id,
+          startedAt: new Date().toISOString(),
+          status: "running",
+          totalChecks: profileChargeUnits,
+          successfulChecks: 0,
+          failedChecks: 0,
+          chargedUnits: profileChargeUnits,
+          refundedUnits: 0,
+          tpLinkTaskId: response.result.taskId,
+          profileId
+        };
+
+        await store.addRun(run);
+        runs.push(run);
+        startedRuns.push(run);
+      } catch (error) {
+        const errorMessage = toErrorMessage(error);
+        const errorCodeMatch = /error_code=(-?\d+)/.exec(errorMessage);
+        const errorCode = errorCodeMatch ? Number(errorCodeMatch[1]) : -40003;
+        const failedRun: InspectionRun = {
+          id: slugId("run"),
+          taskId: task.id,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          status: "failed",
+          totalChecks: profileChargeUnits,
+          successfulChecks: 0,
+          failedChecks: profileChargeUnits,
+          chargedUnits: profileChargeUnits,
+          refundedUnits: profileChargeUnits,
+          profileId
+        };
+
+        await store.addRun(failedRun);
+        const profileFailures = buildExecutionFailures(task, failedRun.id, profileDevices, task.algorithmIds, errorCode, errorMessage);
+        executionFailures.push(...profileFailures);
+        await store.addFailures(profileFailures);
+        runs.push(failedRun);
+
+        if (profileChargeUnits > 0) {
+          await refundUnits(task.id, profileChargeUnits);
+          refundedUnitsSoFar += profileChargeUnits;
+        }
       }
-
-      if ((versionResponse.result?.failList?.length ?? 0) > 0) {
-        const failSummary = versionResponse.result?.failList
-          ?.map((item) => `${item.algorithmId}@${item.algorithmVersion}: ${item.error_code}`)
-          .join("; ");
-        throw new Error(`TP-LINK algorithm version setup partially failed: profile=${profileId}; ${failSummary}`);
-      }
-
-      const response = await startTpLinkInspectionTask(
-        {
-          callbackAddress: `${env.appBaseUrl}/api/callbacks/tplink/ai-task`,
-          algorithmIdList: task.algorithmIds,
-          type: 1,
-          devList: buildTpLinkDevList({ ...task, devices: profileDevices })
-        },
-        profileId
-      );
-
-      if (response.error_code !== 0) {
-        throw new Error(`TP-LINK inspection start failed: profile=${profileId}, error_code=${response.error_code}`);
-      }
-
-      if (!response.result?.taskId) {
-        throw new Error(`TP-LINK did not return a taskId for profile=${profileId}: ${JSON.stringify(response)}`);
-      }
-
-      const run: InspectionRun = {
-        id: slugId("run"),
-        taskId: task.id,
-        startedAt: new Date().toISOString(),
-        status: "running",
-        totalChecks: profileDevices.length * task.algorithmIds.length,
-        successfulChecks: 0,
-        failedChecks: 0,
-        chargedUnits: profileDevices.length * task.algorithmIds.length,
-        refundedUnits: 0,
-        tpLinkTaskId: response.result.taskId,
-        profileId
-      };
-
-      await store.addRun(run);
-      runs.push(run);
     }
 
     await updateTaskRuntimeFields(task.id, {
-      status: executableGroups.length > 0 ? "running" : "enabled",
+      status: startedRuns.length > 0 ? "running" : "enabled",
       updatedAt: now.toISOString(),
       nextRunAt: nextRunAtAfterDispatch
     });
     revalidateTaskReadModels();
 
-    return { run: runs[0], runs, results: [], failures: unsupportedFailures, messages: [] };
+    return { run: runs[0], runs, results: [], failures: [...upfrontFailures, ...executionFailures], messages: [] };
   } catch (error) {
     if (chargeUnitsCount > 0) {
-      await refundUnits(task.id, chargeUnitsCount);
+      const refundableUnits = Math.max(0, chargeUnitsCount - (typeof refundedUnitsSoFar === "number" ? refundedUnitsSoFar : 0));
+      if (refundableUnits > 0) {
+        await refundUnits(task.id, refundableUnits);
+      }
     }
     throw error;
   }
