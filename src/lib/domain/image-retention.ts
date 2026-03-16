@@ -131,7 +131,12 @@ async function updateMediaImageMetadata(media: MediaAsset, patch: Partial<MediaA
 
 async function markRunImagesDeleted(run: InspectionRun, deletedAt = new Date().toISOString()) {
   const store = await getAppStore();
-  await store.updateRun({ ...run, tpLinkResultsDeletedAt: deletedAt });
+  await store.updateRun({ ...run, tpLinkResultsDeletedAt: deletedAt, tpLinkResultsDeleteError: undefined });
+}
+
+async function markRunImageDeletionError(run: InspectionRun, message: string) {
+  const store = await getAppStore();
+  await store.updateRun({ ...run, tpLinkResultsDeleteError: message });
 }
 
 async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
@@ -147,11 +152,84 @@ async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
 
   const response = await deleteTpLinkInspectionTaskResults([run.tpLinkTaskId], run.profileId);
   if (response.error_code !== 0) {
-    throw new Error(`TP-LINK batchDeleteAiTaskResult failed: profile=${run.profileId}, error_code=${response.error_code}`);
+    const message = `TP-LINK batchDeleteAiTaskResult failed: profile=${run.profileId}, error_code=${response.error_code}`;
+    await markRunImageDeletionError(run, message);
+    throw new Error(message);
   }
 
   await markRunImagesDeleted(run);
   return true;
+}
+
+export async function getImageBackfillStatus(limit = 20) {
+  const client = getSupabaseAdminClient();
+  const bucketName = process.env.SUPABASE_INSPECTION_MEDIA_BUCKET ?? "inspection-media";
+  let bucketExists = false;
+  let bucketError: string | undefined;
+
+  if (client) {
+    try {
+      const { data, error } = await client.storage.listBuckets();
+      if (error) {
+        bucketError = error.message;
+      } else {
+        bucketExists = (data ?? []).some((bucket) => bucket.name === bucketName);
+      }
+    } catch (error) {
+      bucketError = error instanceof Error ? error.message : "Unknown bucket inspection error";
+    }
+  }
+
+  const snapshot = await getFreshSnapshot();
+  const results = snapshot.results.filter((item) => item.remoteImageUrl);
+  const messages = snapshot.messages.filter((item) => item.remoteImageUrl);
+  const localizedResults = results.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
+  const pendingResults = results.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
+  const localizedMessages = messages.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
+  const pendingMessages = messages.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
+  const groupedRuns = snapshot.runs
+    .filter((run) => run.tpLinkTaskId)
+    .map((run) => {
+      const runResults = results.filter((item) => item.runId === run.id);
+      const localizedCount = runResults.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage").length;
+      const pendingCount = runResults.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage").length;
+      return {
+        runId: run.id,
+        taskId: run.taskId,
+        profileId: run.profileId,
+        tpLinkTaskId: run.tpLinkTaskId,
+        totalImageCount: runResults.length,
+        localizedCount,
+        pendingCount,
+        deletedAt: run.tpLinkResultsDeletedAt,
+        deleteError: run.tpLinkResultsDeleteError
+      };
+    })
+    .sort((left, right) => {
+      const leftDeletedAt = left.deletedAt ? Date.parse(left.deletedAt) : 0;
+      const rightDeletedAt = right.deletedAt ? Date.parse(right.deletedAt) : 0;
+      return rightDeletedAt - leftDeletedAt;
+    });
+
+  return {
+    storageConfigured: Boolean(client),
+    bucketName,
+    bucketExists,
+    bucketError,
+    resultImages: {
+      total: results.length,
+      localized: localizedResults.length,
+      pending: pendingResults.length,
+      expired: results.filter((item) => item.imageSource === "expired").length
+    },
+    messageImages: {
+      total: messages.length,
+      localized: localizedMessages.length,
+      pending: pendingMessages.length,
+      expired: messages.filter((item) => item.imageSource === "expired").length
+    },
+    runs: groupedRuns.slice(0, Math.max(1, limit))
+  };
 }
 
 export async function persistResultImage(resultId: string) {

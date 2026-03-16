@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   ChevronDown,
   ChevronLeft,
   CircleHelp,
@@ -12,26 +13,27 @@ import {
   LineChart,
   Menu,
   SunMedium,
-  User,
-  Bell
+  User
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { href: "/tasks", label: "巡检任务", icon: LayoutList },
-  { href: "/analytics", label: "巡检数据", icon: LineChart },
-  { href: "/messages", label: "消息中心", icon: Bell }
+  { href: "/tasks/select", label: "AI巡检算法", icon: Menu, matchers: ["/tasks/select", "/tasks/choose"] },
+  { href: "/tasks", label: "巡检任务", icon: LayoutList, matchers: ["/tasks"] },
+  { href: "/analytics", label: "巡检数据", icon: LineChart, matchers: ["/analytics"] },
+  { href: "/messages", label: "消息中心", icon: Bell, matchers: ["/messages"] }
 ];
 
-function matches(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function matches(pathname: string, href: string, matchers: string[] = [href]) {
+  return matchers.some((matcher) => pathname === matcher || pathname.startsWith(`${matcher}/`));
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showSidebar =
     pathname === "/tasks/select" ||
+    pathname === "/tasks/choose" ||
     pathname === "/tasks" ||
     pathname === "/analytics" ||
     pathname === "/messages";
@@ -102,7 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <nav className="tplink-sidebar-nav" aria-label="AI巡检导航">
               {navigation.map((item) => {
                 const Icon = item.icon;
-                const active = matches(pathname, item.href);
+                const active = matches(pathname, item.href, item.matchers);
                 return (
                   <Link key={item.href} href={item.href} className={cn("tplink-sidebar-item", active && "tplink-sidebar-item-active")}>
                     <span className="tplink-sidebar-icon">

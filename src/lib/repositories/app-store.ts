@@ -1,5 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 
+import { dedupeDevicesByIdentity, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
 import env from "@/lib/env";
 import { fetchTpLinkDeviceByQrCode, fetchTpLinkDevices } from "@/lib/tplink/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/client";
@@ -236,7 +237,8 @@ function mapRunRow(row: Record<string, any>): InspectionRun {
     refundedUnits: row.refunded_units,
     tpLinkTaskId: row.tplink_task_id ?? undefined,
     profileId: row.profile_id ?? undefined,
-    tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined
+    tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined,
+    tpLinkResultsDeleteError: row.tplink_results_delete_error ?? undefined
   };
 }
 
@@ -502,6 +504,16 @@ function buildKnownDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   return Array.from(merged.values());
 }
 
+function reconcileTaskDevicesWithLiveDevices(taskDevices: DeviceRef[], liveDevices: DeviceRef[]) {
+  const preferredProfileId = getPreferredProfileId(taskDevices);
+  return dedupeDevicesByIdentity(
+    taskDevices.map((device) => {
+      const candidates = liveDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
+      return candidates.length > 0 ? reconcileDevice(device, candidates, preferredProfileId) : device;
+    })
+  );
+}
+
 async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot | null> {
   return withReadCache(`snapshot:${includeDevices ? "with-devices" : "lite"}`, async () => {
   const client = getSupabaseAdminClient();
@@ -568,25 +580,22 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
   const deviceByQrCode = new Map(devices.map((device) => [device.qrCode, device] as const));
 
   for (const task of tasks) {
-    task.devices = Array.from(
-      new Map(
-        task.devices
-          .map((device) => {
-            const compositeKey = `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
-            const matched =
-              deviceByCompositeKey.get(compositeKey) ??
-              Array.from(deviceByCompositeKey.values()).find(
-                (candidate) =>
-                  candidate.qrCode === device.qrCode &&
-                  candidate.channelId === device.channelId &&
-                  (!device.mac || !candidate.mac || device.mac === candidate.mac)
-              ) ??
-              deviceByQrCode.get(device.qrCode);
+    task.devices = reconcileTaskDevicesWithLiveDevices(
+      task.devices.map((device) => {
+        const compositeKey = `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
+        const matched =
+          deviceByCompositeKey.get(compositeKey) ??
+          Array.from(deviceByCompositeKey.values()).find(
+            (candidate) =>
+              candidate.qrCode === device.qrCode &&
+              candidate.channelId === device.channelId &&
+              (!device.mac || !candidate.mac || device.mac === candidate.mac)
+          ) ??
+          deviceByQrCode.get(device.qrCode);
 
-            return { ...device, ...(matched ?? {}) };
-          })
-          .map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)
-      ).values()
+        return { ...device, ...(matched ?? {}) };
+      }),
+      devices
     );
 
     if (task.devices.length === 0) {
@@ -660,7 +669,8 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
       refundedUnits: row.refunded_units,
       tpLinkTaskId: row.tplink_task_id ?? undefined,
       profileId: row.profile_id ?? undefined,
-      tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined
+      tpLinkResultsDeletedAt: row.tplink_results_deleted_at ?? undefined,
+      tpLinkResultsDeleteError: row.tplink_results_delete_error ?? undefined
     })),
     results: (resultRes.data ?? []).map<InspectionResult>((row) => ({
       id: row.id,
@@ -761,6 +771,7 @@ export async function getAppStore() {
     },
     async listTasksData() {
       return withReadCache("tasks:list", async () => {
+        const liveDevices = await fetchTpLinkDevices().catch(() => [] as DeviceRef[]);
         const nestedRes = await client
           .from("inspection_tasks")
           .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
@@ -772,7 +783,10 @@ export async function getAppStore() {
             nestedRes.data.flatMap((row) => row.inspection_task_devices ?? []),
             nestedRes.data.flatMap((row) => row.inspection_task_schedules ?? []),
             nestedRes.data.flatMap((row) => row.inspection_task_regions ?? [])
-          );
+          ).map((task) => ({
+            ...task,
+            devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+          }));
         }
 
         const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
@@ -783,11 +797,15 @@ export async function getAppStore() {
         ]);
         const errors = [taskRes.error, taskDeviceRes.error, taskScheduleRes.error, taskRegionRes.error].filter(Boolean);
         if (errors.length > 0) throw errors[0];
-        return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
+        return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []).map((task) => ({
+          ...task,
+          devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+        }));
       });
     },
     async getTaskSummaryData(taskId: string) {
       return withReadCache(`task:${taskId}:summary`, async () => {
+        const liveDevices = await fetchTpLinkDevices().catch(() => [] as DeviceRef[]);
         const nestedRes = await client
           .from("inspection_tasks")
           .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
@@ -801,7 +819,13 @@ export async function getAppStore() {
             nestedRes.data.inspection_task_schedules ?? [],
             nestedRes.data.inspection_task_regions ?? []
           );
-          return tasks[0] ?? null;
+          const task = tasks[0] ?? null;
+          return task
+            ? {
+                ...task,
+                devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+              }
+            : null;
         }
 
         const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
@@ -816,7 +840,13 @@ export async function getAppStore() {
         if (!taskRes.data) return null;
 
         const tasks = composeTasks([taskRes.data], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
-        return tasks[0] ?? null;
+        const task = tasks[0] ?? null;
+        return task
+          ? {
+              ...task,
+              devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
+            }
+          : null;
       });
     },
     async getTaskRunsData(taskId: string) {
@@ -1141,7 +1171,8 @@ export async function getAppStore() {
         refunded_units: run.refundedUnits,
         tplink_task_id: run.tpLinkTaskId ?? null,
         profile_id: run.profileId ?? null,
-        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null
+        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null,
+        tplink_results_delete_error: run.tpLinkResultsDeleteError ?? null
       });
       if (error && isMissingColumnError(error)) {
         ({ error } = await client.from("inspection_runs").insert({
@@ -1174,7 +1205,8 @@ export async function getAppStore() {
         refunded_units: run.refundedUnits,
         tplink_task_id: run.tpLinkTaskId ?? null,
         profile_id: run.profileId ?? null,
-        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null
+        tplink_results_deleted_at: run.tpLinkResultsDeletedAt ?? null,
+        tplink_results_delete_error: run.tpLinkResultsDeleteError ?? null
         })
         .eq("id", run.id);
       if (error && isMissingColumnError(error)) {

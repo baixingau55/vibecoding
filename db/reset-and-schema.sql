@@ -117,7 +117,8 @@ create table if not exists inspection_runs (
   refunded_units integer not null,
   tplink_task_id text,
   profile_id text,
-  tplink_results_deleted_at timestamptz
+  tplink_results_deleted_at timestamptz,
+  tplink_results_delete_error text
 );
 
 create table if not exists inspection_results (

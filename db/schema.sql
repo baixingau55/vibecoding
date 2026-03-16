@@ -185,6 +185,7 @@ create table if not exists scheduler_scans (
 );
 
 alter table inspection_runs add column if not exists tplink_results_deleted_at timestamptz;
+alter table inspection_runs add column if not exists tplink_results_delete_error text;
 alter table inspection_results add column if not exists image_storage_path text;
 alter table inspection_results add column if not exists image_source text;
 alter table inspection_results add column if not exists image_synced_at timestamptz;

@@ -1,6 +1,7 @@
 import env from "@/lib/env";
 import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
+import { dedupeDevicesByIdentity, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
 import { persistImagesForRun } from "@/lib/domain/image-retention";
 import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
 import { getAppSnapshot } from "@/lib/domain/store";
@@ -278,9 +279,7 @@ function mergeTaskInput(previous: InspectionTask | null, input: Partial<TaskInpu
 }
 
 function dedupeDevices(devices: InspectionTask["devices"]) {
-  return Array.from(
-    new Map(devices.map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)).values()
-  );
+  return dedupeDevicesByIdentity(devices);
 }
 
 function isPlaceholderDeviceIdentity(device: InspectionTask["devices"][number]) {
@@ -325,28 +324,21 @@ function pickBestDeviceCandidate(
 
 async function resolveTaskDevicesForExecution(task: InspectionTask) {
   const allDevices = await fetchTpLinkDevices().catch(() => []);
-  const knownProfileCounts = new Map<string, number>();
-  for (const device of task.devices) {
-    if (!device.profileId) continue;
-    knownProfileCounts.set(device.profileId, (knownProfileCounts.get(device.profileId) ?? 0) + 1);
-  }
-  const preferredProfileId =
-    [...knownProfileCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? undefined;
+  const preferredProfileId = getPreferredProfileId(task.devices);
 
-  return Promise.all(
+  const resolved = await Promise.all(
     task.devices.map(async (device) => {
-      if (device.profileId) return device;
-
       const candidates = allDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
-      const bestCandidate = pickBestDeviceCandidate(device, candidates, preferredProfileId);
-      if (bestCandidate) {
-        return { ...device, ...bestCandidate };
+      if (candidates.length > 0) {
+        return reconcileDevice(device, candidates, preferredProfileId);
       }
 
       const fetched = await fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null);
-      return fetched ? { ...device, ...fetched } : device;
+      return fetched ? reconcileDevice(device, [fetched], preferredProfileId) : device;
     })
   );
+
+  return dedupeDevicesByIdentity(resolved);
 }
 
 async function reconcileRunningTaskState(task: InspectionTask, now = new Date()) {
@@ -986,6 +978,14 @@ export async function executeTask(taskId: string, options?: { scheduledAt?: stri
   }
 
   const resolvedDevices = await resolveTaskDevicesForExecution(task);
+  if (JSON.stringify(dedupeDevices(task.devices)) !== JSON.stringify(dedupeDevices(resolvedDevices))) {
+    const store = await getAppStore();
+    await store.upsertTask({
+      ...task,
+      devices: dedupeDevices(resolvedDevices),
+      updatedAt: now.toISOString()
+    });
+  }
   const onlineDevices = resolvedDevices.filter((device) => device.status === "online");
   const offlineDevices = resolvedDevices.filter((device) => device.status !== "online");
   const algorithms = await getAlgorithms();

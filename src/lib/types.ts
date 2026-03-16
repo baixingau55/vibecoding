@@ -126,6 +126,7 @@ export interface InspectionRun {
   tpLinkTaskId?: string;
   profileId?: TpLinkProfileId;
   tpLinkResultsDeletedAt?: string;
+  tpLinkResultsDeleteError?: string;
 }
 
 export interface InspectionResult {
