@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import env from "@/lib/env";
 import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
@@ -260,6 +262,34 @@ function buildUnqualifiedMessage(task: InspectionTask, runId: string, result: In
     imageSource: result.imageUrl ? "tplink_remote" : undefined,
     remoteImageUrl: result.remoteImageUrl ?? result.imageUrl
   };
+}
+
+function deterministicId(prefix: string, ...parts: Array<string | number | undefined | null>) {
+  const hash = createHash("sha1")
+    .update(
+      parts
+        .map((part) => `${part ?? ""}`)
+        .join("|")
+    )
+    .digest("hex")
+    .slice(0, 12);
+  return `${prefix}_${hash}`;
+}
+
+function buildCallbackResultId(run: InspectionRun, item: { qrCode?: string; qrcode?: string; channelId: number; algorithmId: string; imageTime?: string; imageUrl?: string }) {
+  const qrCode = item.qrCode ?? item.qrcode ?? "";
+  return deterministicId("result", run.id, qrCode, item.channelId, item.algorithmId, item.imageTime ?? "", item.imageUrl ?? "");
+}
+
+function buildCallbackFailureId(run: InspectionRun, item: { qrCode?: string; qrcode?: string; channelId: number; algorithmId?: string; error_code?: number }) {
+  const qrCode = item.qrCode ?? item.qrcode ?? "";
+  return deterministicId("failure", run.id, qrCode, item.channelId, item.algorithmId ?? "", item.error_code ?? "");
+}
+
+function buildCallbackMessageIds(task: InspectionTask, result: InspectionResult) {
+  const messageId = deterministicId("msg", task.id, result.runId, result.id, result.qrCode, result.channelId, result.algorithmId, result.imageTime);
+  const imageId = result.imageUrl ? deterministicId("image", messageId, result.imageUrl) : undefined;
+  return { messageId, imageId };
 }
 
 function mergeTaskInput(previous: InspectionTask | null, input: Partial<TaskInput> & { id?: string }) {
@@ -1280,12 +1310,20 @@ export async function handleTpLinkTaskCallback(payload: {
   const failures: InspectionFailure[] = [];
   const messages: MessageItem[] = [];
   const mediaAssets: MediaAsset[] = [];
+  const existingResults = snapshot.results.filter((item) => item.runId === run.id);
+  const existingFailures = snapshot.failures.filter((item) => item.runId === run.id);
+  const existingMessages = snapshot.messages.filter((item) => item.runId === run.id);
+  const existingMedia = snapshot.media.filter((item) => item.taskId === task.id);
+  const existingResultIds = new Set(existingResults.map((item) => item.id));
+  const existingFailureIds = new Set(existingFailures.map((item) => item.id));
+  const existingMessageIds = new Set(existingMessages.map((item) => item.id));
+  const existingMediaIds = new Set(existingMedia.map((item) => item.id));
 
   for (const item of payload.resultList ?? []) {
     const qrCode = item.qrCode ?? item.qrcode ?? "";
     if (item.error_code && item.error_code !== 0) {
       failures.push({
-        id: slugId("failure"),
+        id: buildCallbackFailureId(run, item),
         runId: run.id,
         taskId: task.id,
         qrCode,
@@ -1298,7 +1336,7 @@ export async function handleTpLinkTaskCallback(payload: {
     }
 
     const result: InspectionResult = {
-      id: slugId("result"),
+      id: buildCallbackResultId(run, item),
       runId: run.id,
       taskId: task.id,
       qrCode,
@@ -1317,6 +1355,9 @@ export async function handleTpLinkTaskCallback(payload: {
 
     const message = buildUnqualifiedMessage(task, run.id, result);
     if (message) {
+      const { messageId, imageId } = buildCallbackMessageIds(task, result);
+      message.id = messageId;
+      message.imageId = imageId;
       messages.push(message);
       if (message.imageId && message.imageUrl) {
         mediaAssets.push({
@@ -1333,26 +1374,36 @@ export async function handleTpLinkTaskCallback(payload: {
     }
   }
 
-  const refundedUnits = failures.length;
+  const newResults = results.filter((item) => !existingResultIds.has(item.id));
+  const newFailures = failures.filter((item) => !existingFailureIds.has(item.id));
+  const newMessages = messages.filter((item) => !existingMessageIds.has(item.id));
+  const newMediaAssets = mediaAssets.filter((item) => !existingMediaIds.has(item.id));
+
+  const totalSuccessfulChecks = existingResults.length + newResults.length;
+  const totalFailedChecks = existingFailures.length + newFailures.length;
+  const refundedUnits = totalFailedChecks;
   if (refundedUnits > 0) {
-    await refundUnits(task.id, refundedUnits);
+    const incrementalRefund = Math.max(0, refundedUnits - run.refundedUnits);
+    if (incrementalRefund > 0) {
+      await refundUnits(task.id, incrementalRefund);
+    }
   }
 
   const finalRun: InspectionRun = {
     ...run,
     completedAt: new Date().toISOString(),
-    status: failures.length > 0 ? (results.length > 0 ? "partial_success" : "failed") : "completed",
-    successfulChecks: results.length,
-    failedChecks: failures.length,
+    status: totalFailedChecks > 0 ? (totalSuccessfulChecks > 0 ? "partial_success" : "failed") : "completed",
+    successfulChecks: totalSuccessfulChecks,
+    failedChecks: totalFailedChecks,
     chargedUnits: run.chargedUnits,
     refundedUnits
   };
 
   const store = await getAppStore();
-  await store.addResults(results);
-  await store.addFailures(failures);
-  await store.addMessages(messages);
-  for (const asset of mediaAssets) {
+  await store.addResults(newResults);
+  await store.addFailures(newFailures);
+  await store.addMessages(newMessages);
+  for (const asset of newMediaAssets) {
     await store.addMedia(asset);
   }
   await store.updateRun(finalRun);
@@ -1384,5 +1435,11 @@ export async function handleTpLinkTaskCallback(payload: {
     };
   }
 
-  return { ok: true, resultCount: results.length, failureCount: failures.length, messageCount: messages.length, imageSync };
+  return {
+    ok: true,
+    resultCount: totalSuccessfulChecks,
+    failureCount: totalFailedChecks,
+    messageCount: existingMessages.length + newMessages.length,
+    imageSync
+  };
 }
