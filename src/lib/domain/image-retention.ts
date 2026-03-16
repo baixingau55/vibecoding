@@ -275,6 +275,23 @@ async function isResultLocalized(result: InspectionResult) {
   return Boolean(image);
 }
 
+async function isMessageLocalized(snapshot: Awaited<ReturnType<typeof getFreshSnapshot>>, message: MessageItem) {
+  if (message.imageStoragePath && message.imageSource === "supabase_storage") {
+    return true;
+  }
+
+  if (message.resultId) {
+    const linkedResult = snapshot.results.find((item) => item.id === message.resultId);
+    if (linkedResult && (await isResultLocalized(linkedResult))) {
+      return true;
+    }
+  }
+
+  if (!message.remoteImageUrl) return false;
+  const image = await tryReadStoredImage(buildMessageImagePath(message, null));
+  return Boolean(image);
+}
+
 function getRunProfileId(
   snapshot: Awaited<ReturnType<typeof getFreshSnapshot>>,
   run: InspectionRun,
@@ -350,10 +367,12 @@ export async function getImageBackfillStatus(limit = 20) {
   const snapshot = await getFreshSnapshot();
   const results = snapshot.results.filter((item) => item.remoteImageUrl);
   const messages = snapshot.messages.filter((item) => item.remoteImageUrl);
-  const localizedResults = results.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
-  const pendingResults = results.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
-  const localizedMessages = messages.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
-  const pendingMessages = messages.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
+  const localizedResultFlags = await Promise.all(results.map((item) => isResultLocalized(item).catch(() => false)));
+  const localizedMessageFlags = await Promise.all(messages.map((item) => isMessageLocalized(snapshot, item).catch(() => false)));
+  const localizedResults = results.filter((_, index) => localizedResultFlags[index]);
+  const pendingResults = results.filter((_, index) => !localizedResultFlags[index]);
+  const localizedMessages = messages.filter((_, index) => localizedMessageFlags[index]);
+  const pendingMessages = messages.filter((_, index) => !localizedMessageFlags[index]);
   const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId).slice(0, Math.max(1, limit));
   const groupedRuns = (
     await Promise.all(
@@ -405,6 +424,11 @@ export async function getImageBackfillStatus(limit = 20) {
       localized: localizedMessages.length,
       pending: pendingMessages.length,
       expired: messages.filter((item) => item.imageSource === "expired").length
+    },
+    summary: {
+      deletableRuns: groupedRuns.filter((item) => item.readyToDelete && !item.deletedAt).length,
+      deletedRuns: groupedRuns.filter((item) => Boolean(item.deletedAt)).length,
+      failedDeletes: groupedRuns.filter((item) => Boolean(item.deleteError)).length
     },
     runs: groupedRuns.slice(0, Math.max(1, limit))
   };

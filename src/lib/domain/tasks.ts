@@ -1,7 +1,7 @@
 import env from "@/lib/env";
 import { CACHE_TAGS, revalidateTaskReadModels } from "@/lib/domain/cache-tags";
 import { getAlgorithms } from "@/lib/domain/algorithms";
-import { dedupeDevicesByIdentity, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
+import { dedupeDevicesByIdentity, filterCandidatesForDevice, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
 import { getImageRetentionExpiresAt, persistImagesForRun } from "@/lib/domain/image-retention";
 import { chargeUnits, getServiceBalance, refundUnits } from "@/lib/domain/service-balance";
 import { getAppSnapshot } from "@/lib/domain/store";
@@ -328,12 +328,15 @@ async function resolveTaskDevicesForExecution(task: InspectionTask) {
 
   const resolved = await Promise.all(
     task.devices.map(async (device) => {
-      const candidates = allDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
+      const candidates = filterCandidatesForDevice(
+        device,
+        allDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId)
+      );
       if (candidates.length > 0) {
         return reconcileDevice(device, candidates, preferredProfileId);
       }
 
-      const fetched = await fetchTpLinkDeviceByQrCode(device.qrCode).catch(() => null);
+      const fetched = await fetchTpLinkDeviceByQrCode(device.qrCode, device.profileId).catch(() => null);
       return fetched ? reconcileDevice(device, [fetched], preferredProfileId) : device;
     })
   );

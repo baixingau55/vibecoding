@@ -1,6 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 
-import { dedupeDevicesByIdentity, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
+import { dedupeDevicesByIdentity, filterCandidatesForDevice, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
 import env from "@/lib/env";
 import { fetchTpLinkDeviceByQrCode, fetchTpLinkDevices } from "@/lib/tplink/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/client";
@@ -537,7 +537,10 @@ function reconcileTaskDevicesWithLiveDevices(taskDevices: DeviceRef[], liveDevic
   const preferredProfileId = getPreferredProfileId(taskDevices);
   return dedupeDevicesByIdentity(
     taskDevices.map((device) => {
-      const candidates = liveDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId);
+      const candidates = filterCandidatesForDevice(
+        device,
+        liveDevices.filter((candidate) => candidate.qrCode === device.qrCode && candidate.channelId === device.channelId)
+      );
       return candidates.length > 0 ? reconcileDevice(device, candidates, preferredProfileId) : device;
     })
   );
@@ -612,15 +615,27 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
     task.devices = reconcileTaskDevicesWithLiveDevices(
       task.devices.map((device) => {
         const compositeKey = `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
-        const matched =
-          deviceByCompositeKey.get(compositeKey) ??
-          Array.from(deviceByCompositeKey.values()).find(
-            (candidate) =>
-              candidate.qrCode === device.qrCode &&
-              candidate.channelId === device.channelId &&
-              (!device.mac || !candidate.mac || device.mac === candidate.mac)
-          ) ??
-          deviceByQrCode.get(device.qrCode);
+        const exactMatch = deviceByCompositeKey.get(compositeKey);
+        const sameProfileMatch =
+          !exactMatch && device.profileId
+            ? Array.from(deviceByCompositeKey.values()).find(
+                (candidate) =>
+                  candidate.profileId === device.profileId &&
+                  candidate.qrCode === device.qrCode &&
+                  candidate.channelId === device.channelId &&
+                  (!device.mac || !candidate.mac || device.mac === candidate.mac)
+              )
+            : undefined;
+        const relaxedMatch =
+          !device.profileId && !exactMatch && !sameProfileMatch
+            ? Array.from(deviceByCompositeKey.values()).find(
+                (candidate) =>
+                  candidate.qrCode === device.qrCode &&
+                  candidate.channelId === device.channelId &&
+                  (!device.mac || !candidate.mac || device.mac === candidate.mac)
+              )
+            : undefined;
+        const matched = exactMatch ?? sameProfileMatch ?? relaxedMatch ?? (!device.profileId ? deviceByQrCode.get(device.qrCode) : undefined);
 
         return { ...device, ...(matched ?? {}) };
       }),

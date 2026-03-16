@@ -55,6 +55,13 @@ export function pickBestDeviceCandidate(source: DeviceRef, candidates: DeviceRef
   )[0];
 }
 
+export function filterCandidatesForDevice(source: Pick<DeviceRef, "profileId">, candidates: DeviceRef[]) {
+  if (!source.profileId) return candidates;
+
+  const sameProfileCandidates = candidates.filter((candidate) => candidate.profileId === source.profileId);
+  return sameProfileCandidates;
+}
+
 export function reconcileDevice(source: DeviceRef, candidates: DeviceRef[], preferredProfileId?: string) {
   const bestCandidate = pickBestDeviceCandidate(source, candidates, preferredProfileId);
   if (!bestCandidate) return source;
