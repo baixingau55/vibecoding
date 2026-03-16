@@ -144,7 +144,7 @@ async function tryReadStoredImage(path: string) {
     return await readStoredImage(path);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/not found/i.test(message) || /Object not found/i.test(message) || /404/.test(message)) {
+    if (/not found/i.test(message) || /object not found/i.test(message) || /404/.test(message)) {
       return null;
     }
     throw error;
@@ -275,10 +275,21 @@ async function isResultLocalized(result: InspectionResult) {
   return Boolean(image);
 }
 
+function getRunProfileId(snapshot: Awaited<ReturnType<typeof getFreshSnapshot>>, run: InspectionRun) {
+  if (run.profileId) return run.profileId;
+
+  return (
+    snapshot.results.find((item) => item.runId === run.id && item.profileId)?.profileId ??
+    snapshot.messages.find((item) => item.runId === run.id && item.profileId)?.profileId
+  );
+}
+
 async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
-  if (!run.tpLinkTaskId || !run.profileId || run.tpLinkResultsDeletedAt) return false;
+  if (!run.tpLinkTaskId || run.tpLinkResultsDeletedAt) return false;
 
   const snapshot = await getFreshSnapshot();
+  const profileId = getRunProfileId(snapshot, run);
+  if (!profileId) return false;
   const runResults = snapshot.results.filter((item) => item.runId === run.id);
   const imageResults = runResults.filter((item) => item.remoteImageUrl);
   if (imageResults.length === 0) return false;
@@ -287,9 +298,9 @@ async function maybeDeleteTpLinkImagesForRun(run: InspectionRun) {
   const allReady = readiness.every(Boolean);
   if (!allReady) return false;
 
-  const response = await deleteTpLinkInspectionTaskResults([run.tpLinkTaskId], run.profileId);
+  const response = await deleteTpLinkInspectionTaskResults([run.tpLinkTaskId], profileId);
   if (response.error_code !== 0) {
-    const message = `TP-LINK batchDeleteAiTaskResult failed: profile=${run.profileId}, error_code=${response.error_code}`;
+    const message = `TP-LINK batchDeleteAiTaskResult failed: profile=${profileId}, error_code=${response.error_code}`;
     await markRunImageDeletionError(run, message);
     throw new Error(message);
   }
@@ -325,17 +336,23 @@ export async function getImageBackfillStatus(limit = 20) {
   const pendingResults = results.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
   const localizedMessages = messages.filter((item) => item.imageStoragePath && item.imageSource === "supabase_storage");
   const pendingMessages = messages.filter((item) => !item.imageStoragePath || item.imageSource !== "supabase_storage");
+  const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId).slice(0, Math.max(1, limit));
   const groupedRuns = (
     await Promise.all(
-      snapshot.runs.filter((run) => run.tpLinkTaskId).map(async (run) => {
+      candidateRuns.map(async (run) => {
         const runResults = results.filter((item) => item.runId === run.id);
-        const localizedFlags = await Promise.all(runResults.map((item) => isResultLocalized(item)));
-        const localizedCount = localizedFlags.filter(Boolean).length;
+        let localizedCount = 0;
+        try {
+          const localizedFlags = await Promise.all(runResults.map((item) => isResultLocalized(item)));
+          localizedCount = localizedFlags.filter(Boolean).length;
+        } catch (error) {
+          localizedCount = 0;
+        }
         const pendingCount = Math.max(0, runResults.length - localizedCount);
         return {
           runId: run.id,
           taskId: run.taskId,
-          profileId: run.profileId,
+          profileId: getRunProfileId(snapshot, run),
           tpLinkTaskId: run.tpLinkTaskId,
           totalImageCount: runResults.length,
           localizedCount,
@@ -377,7 +394,7 @@ export async function getImageBackfillStatus(limit = 20) {
 
 export async function deleteLocalizedTpLinkResults(limit = 20) {
   const snapshot = await getFreshSnapshot();
-  const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId && run.profileId).slice(0, Math.max(1, limit));
+  const candidateRuns = snapshot.runs.filter((run) => run.tpLinkTaskId).slice(0, Math.max(1, limit));
   const deleted: Array<{ runId: string; taskId: string; tpLinkTaskId: string; profileId: string }> = [];
   const skipped: Array<{ runId: string; reason: string }> = [];
   const failed: Array<{ runId: string; tpLinkTaskId?: string; error: string }> = [];
@@ -390,7 +407,7 @@ export async function deleteLocalizedTpLinkResults(limit = 20) {
           runId: run.id,
           taskId: run.taskId,
           tpLinkTaskId: run.tpLinkTaskId!,
-          profileId: run.profileId!
+          profileId: getRunProfileId(snapshot, run) ?? "unknown"
         });
       } else {
         skipped.push({
