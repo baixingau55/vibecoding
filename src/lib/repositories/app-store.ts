@@ -1069,13 +1069,29 @@ export async function getAppStore() {
     },
     async getTaskPreviewData() {
       return withReadCache("tasks:preview", async () => {
+        let previewRows: Array<Record<string, any>> = [];
+
         const { data, error } = await client
           .from("inspection_results")
           .select("id,task_id,qr_code,image_url,image_time,image_storage_path,image_source,image_expires_at")
-          .not("image_url", "is", null)
+          .or("image_url.not.is.null,image_storage_path.not.is.null")
           .order("image_time", { ascending: false });
-        if (error) throw error;
-        return (data ?? []).map((row) => ({
+
+        if (!error) {
+          previewRows = (data ?? []) as Array<Record<string, any>>;
+        } else if (isMissingColumnError(error)) {
+          const legacyResult = await client
+            .from("inspection_results")
+            .select("id,task_id,qr_code,image_url,image_time")
+            .not("image_url", "is", null)
+            .order("image_time", { ascending: false });
+          if (legacyResult.error) throw legacyResult.error;
+          previewRows = (legacyResult.data ?? []) as Array<Record<string, any>>;
+        } else {
+          throw error;
+        }
+
+        return previewRows.map((row) => ({
           taskId: row.task_id,
           qrCode: row.qr_code,
           imageUrl: resolveResultImageUrl(row),
