@@ -3595,20 +3595,119 @@ button {
   font-size: 12px;
 }
 
-.ai-task-builder-page .ai-device-tabs {
-  gap: 8px;
+.ai-task-builder-page .ai-device-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
 }
 
-.ai-task-builder-page .ai-device-tab,
-.ai-task-builder-page .ai-device-chip {
-  height: 28px;
-  padding: 0 12px;
+.ai-task-builder-page .ai-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 372px;
+  padding: 10px;
+  border: 1px solid #e7ebf3;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ai-device-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 8px;
+  color: #666;
   font-size: 12px;
+}
+
+.ai-device-list-head em {
+  font-style: normal;
+  color: #999;
+}
+
+.ai-device-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #edf0f5;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+}
+
+.ai-device-list-item-active {
+  border-color: #b9d7ff;
+  background: #edf5ff;
+  box-shadow: inset 0 0 0 1px rgba(23, 133, 230, 0.08);
+}
+
+.ai-device-list-item-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-device-list-item-main strong {
+  overflow: hidden;
+  color: #1f1f1f;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-device-list-item-main span {
+  overflow: hidden;
+  color: #8a8f99;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-device-list-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ai-task-builder-page .ai-device-meta-row,
+.ai-task-builder-page .ai-device-region-summary {
+  grid-column: 2;
 }
 
 .ai-task-builder-page .ai-device-meta-row {
-  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 0;
   font-size: 12px;
+}
+
+.ai-device-detail-head {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-device-detail-head strong {
+  color: #1f1f1f;
+  font-size: 14px;
+}
+
+.ai-device-detail-head span {
+  color: #8a8f99;
 }
 
 .ai-device-region-summary {
@@ -3634,6 +3733,23 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.ai-device-region-preview img + .ai-device-region-preview-empty,
+.ai-device-region-preview-loading + .ai-device-region-preview-empty {
+  display: none;
+}
+
+.ai-device-region-preview-loading,
+.ai-device-region-preview-empty {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  color: #8a8f99;
+  font-size: 12px;
+  text-align: center;
 }
 
 .ai-device-region-copy strong {
@@ -3897,6 +4013,15 @@ button {
 }
 
 @media (max-width: 1280px) {
+  .ai-task-builder-page .ai-device-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-task-builder-page .ai-device-meta-row,
+  .ai-task-builder-page .ai-device-region-summary {
+    grid-column: auto;
+  }
+
   .ai-device-modal-grid {
     grid-template-columns: 160px minmax(0, 1fr);
   }

@@ -7,6 +7,7 @@ import { PencilLine, Plus, Trash2, X } from "lucide-react";
 
 import { RegionEditor } from "@/components/tasks/region-editor";
 import type { Algorithm, DeviceRef, InspectionSchedule, InspectionTask, MessageRule, RegionShape } from "@/lib/types";
+import { cn, readJsonResponse } from "@/lib/utils";
 
 function deviceKey(device: Pick<DeviceRef, "qrCode" | "channelId" | "profileId">) {
   return `${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`;
@@ -74,6 +75,11 @@ function toMinutes(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return hour * 60 + minute;
 }
+
+type DevicePreviewState = {
+  url: string;
+  imageTime?: string;
+};
 
 export function TaskBuilder({
   algorithms,
@@ -153,6 +159,10 @@ export function TaskBuilder({
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [selectedGroupName, setSelectedGroupName] = useState("全部分组");
 
+  const [activeDevicePreview, setActiveDevicePreview] = useState<DevicePreviewState | null>(null);
+  const [activeDevicePreviewLoading, setActiveDevicePreviewLoading] = useState(false);
+  const [activeDevicePreviewError, setActiveDevicePreviewError] = useState("");
+
   const customMessageSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -190,6 +200,50 @@ export function TaskBuilder({
     () => Array.from(new Map(availableDevices.map((device) => [deviceKey(device), device] as const)).values()),
     [availableDevices]
   );
+
+  useEffect(() => {
+    let active = true;
+
+    if (!activeDevice) {
+      setActiveDevicePreview(null);
+      setActiveDevicePreviewLoading(false);
+      setActiveDevicePreviewError("");
+      return undefined;
+    }
+
+    setActiveDevicePreviewLoading(true);
+    setActiveDevicePreviewError("");
+
+    void fetch(`/api/devices/${activeDevice.qrCode}/preview?profileId=${activeDevice.profileId ?? ""}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (response.status === 404) {
+          if (active) {
+            setActiveDevicePreview(null);
+          }
+          return null;
+        }
+
+        return readJsonResponse<{ url?: string; imageTime?: string }>(response, "鍔犺浇璁惧鐪熷疄棰勮澶辫触");
+      })
+      .then((payload) => {
+        if (!active || !payload) return;
+        setActiveDevicePreview(payload.url ? { url: payload.url, imageTime: payload.imageTime } : null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setActiveDevicePreview(null);
+        setActiveDevicePreviewError(error instanceof Error ? error.message : "鍔犺浇璁惧鐪熷疄棰勮澶辫触");
+      })
+      .finally(() => {
+        if (active) {
+          setActiveDevicePreviewLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeDevice]);
 
   async function ensureDevicesLoaded() {
     if (allDevices.length > 0 || devicesLoading) return;
@@ -600,18 +654,32 @@ export function TaskBuilder({
               </div>
             ) : (
               <>
-                <div className="ai-device-tabs">
-                  {selectedDevices.map((device) => (
-                    <button
-                      key={deviceKey(device)}
-                      type="button"
-                      className={activeDeviceCode === deviceKey(device) ? "ai-device-tab ai-device-tab-active" : "ai-device-tab"}
-                      onClick={() => setActiveDeviceCode(deviceKey(device))}
-                    >
-                      {device.name}
-                    </button>
-                  ))}
-                </div>
+                <div className="ai-device-layout">
+                  <div className="ai-device-list">
+                    <div className="ai-device-list-head">
+                      <span>设备列表</span>
+                      <em>{selectedDevices.length} 台</em>
+                    </div>
+                    {selectedDevices.map((device) => (
+                      <button
+                        key={deviceKey(device)}
+                        type="button"
+                        className={cn("ai-device-list-item", activeDeviceCode === deviceKey(device) && "ai-device-list-item-active")}
+                        onClick={() => setActiveDeviceCode(deviceKey(device))}
+                      >
+                        <div className="ai-device-list-item-main">
+                          <strong>{device.name}</strong>
+                          <span>{device.groupName}</span>
+                        </div>
+                        <div className="ai-device-list-item-meta">
+                          <span className={device.status === "online" ? "ai-device-status ai-device-status-online" : "ai-device-status"}>
+                            {device.status === "online" ? "在线" : "离线"}
+                          </span>
+                          <span>{(regionsByQrCode[device.qrCode] ?? []).length > 0 ? "已配置区域" : "全画面"}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
 
                 {activeDevice ? (
                   <div className="ai-device-meta-row">
@@ -631,6 +699,8 @@ export function TaskBuilder({
                   {activeDevice ? (
                     <>
                       <div className="ai-device-region-preview">
+                        {activeDevicePreviewLoading ? <div className="ai-device-region-preview-loading">正在加载真实预览...</div> : null}
+                        {activeDevicePreview ? <img src={activeDevicePreview.url} alt={activeDevice.name} /> : null}
                         <div className="ai-device-region-preview-empty">暂无真实预览底图</div>
                       </div>
                       <div className="ai-device-region-copy">
@@ -645,6 +715,7 @@ export function TaskBuilder({
                       </div>
                     </>
                   ) : null}
+                </div>
                 </div>
               </>
             )}
