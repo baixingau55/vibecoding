@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PencilLine, Plus, Trash2, X } from "lucide-react";
 
@@ -150,6 +150,7 @@ export function TaskBuilder({
 
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
   const [allDevices, setAllDevices] = useState<DeviceRef[]>(devices);
+  const [devicesLoaded, setDevicesLoaded] = useState(devices.length > 0);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesLoadError, setDevicesLoadError] = useState("");
   const [deviceSearch, setDeviceSearch] = useState("");
@@ -166,9 +167,13 @@ export function TaskBuilder({
   const [activeDevicePreviewLoading, setActiveDevicePreviewLoading] = useState(false);
   const [activeDevicePreviewError, setActiveDevicePreviewError] = useState("");
   const customMessageSectionRef = useRef<HTMLDivElement | null>(null);
+  const deviceOptionsPrefetchedRef = useRef(false);
 
   useEffect(() => {
     setAllDevices(devices);
+    if (devices.length > 0) {
+      setDevicesLoaded(true);
+    }
   }, [devices]);
 
   useEffect(() => {
@@ -269,8 +274,8 @@ export function TaskBuilder({
   const allVisibleDeviceKeys = useMemo(() => visibleSelectedDevices.map((device) => deviceKey(device)), [visibleSelectedDevices]);
   const allVisibleChecked = allVisibleDeviceKeys.length > 0 && allVisibleDeviceKeys.every((key) => checkedDeviceKeys.includes(key));
 
-  async function ensureDevicesLoaded() {
-    if (allDevices.length > 0 || devicesLoading) return;
+  const ensureDevicesLoaded = useCallback(async () => {
+    if (devicesLoaded || devicesLoading) return;
     setDevicesLoading(true);
     setDevicesLoadError("");
     try {
@@ -281,16 +286,30 @@ export function TaskBuilder({
         throw new Error(payload.error ?? "加载设备列表失败");
       }
       setAllDevices(payload.devices ?? []);
+      setDevicesLoaded(true);
     } catch (error) {
       setDevicesLoadError(error instanceof Error ? error.message : "加载设备列表失败");
     } finally {
       setDevicesLoading(false);
     }
-  }
+  }, [devicesLoaded, devicesLoading, devicesLoaderUrl]);
+
+  useEffect(() => {
+    if (devicesLoaded || deviceOptionsPrefetchedRef.current) {
+      return undefined;
+    }
+
+    deviceOptionsPrefetchedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void ensureDevicesLoaded();
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [devicesLoaded, ensureDevicesLoaded]);
 
   async function openDeviceModal() {
-    await ensureDevicesLoaded();
     setDeviceModalOpen(true);
+    void ensureDevicesLoaded();
   }
 
   function saveName() {
