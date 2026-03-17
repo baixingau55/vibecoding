@@ -3781,6 +3781,150 @@ button {
   line-height: 20px;
 }
 
+.ai-task-builder-page .ai-device-panel > .ai-panel-head .tplink-message-actions,
+.ai-task-builder-page .ai-device-layout {
+  display: none;
+}
+
+.ai-task-builder-page .ai-device-stage {
+  min-height: 560px;
+  margin-top: 8px;
+  padding: 14px 0 0;
+  border-top: 1px solid #eef1f5;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ai-task-builder-page .ai-device-table-panel {
+  display: flex;
+  min-height: 500px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-task-builder-page .ai-device-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-task-builder-page .ai-device-toolbar-left,
+.ai-task-builder-page .ai-device-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-task-builder-page .ai-device-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.ai-task-builder-page .ai-device-toolbar-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #666;
+  font-size: 12px;
+}
+
+.ai-task-builder-page .ai-device-toolbar-filter .ai-input {
+  width: 164px;
+  min-height: 28px;
+  padding: 0 28px 0 10px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.ai-task-builder-page .ai-device-toolbar-search .ai-input {
+  width: 184px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.ai-task-builder-page .ai-device-table-shell {
+  overflow: hidden;
+  border: 1px solid #eef1f5;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.ai-task-builder-page .ai-device-table-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1.6fr) minmax(0, 1.2fr) 100px 130px 144px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef1f5;
+  color: #666;
+  font-size: 12px;
+}
+
+.ai-task-builder-page .ai-device-table-row:last-child {
+  border-bottom: 0;
+}
+
+.ai-task-builder-page .ai-device-table-row-head {
+  min-height: 34px;
+  background: #f5f6f8;
+  color: #999;
+}
+
+.ai-task-builder-page .ai-device-table-row-active {
+  background: #f8fbff;
+}
+
+.ai-task-builder-page .ai-device-table-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-task-builder-page .ai-device-table-check input {
+  width: 14px;
+  height: 14px;
+}
+
+.ai-task-builder-page .ai-device-table-name,
+.ai-task-builder-page .ai-device-table-group,
+.ai-task-builder-page .ai-device-table-region {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-task-builder-page .ai-device-table-name {
+  color: #333;
+}
+
+.ai-task-builder-page .ai-device-table-status {
+  display: flex;
+  align-items: center;
+}
+
+.ai-task-builder-page .ai-device-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: flex-start;
+}
+
+.ai-task-builder-page .ai-device-table-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: #999;
+  font-size: 12px;
+}
+
 .ai-region-modal {
   width: min(960px, 100%);
 }
@@ -4020,6 +4164,20 @@ button {
   .ai-task-builder-page .ai-device-meta-row,
   .ai-task-builder-page .ai-device-region-summary {
     grid-column: auto;
+  }
+
+  .ai-task-builder-page .ai-device-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ai-task-builder-page .ai-device-toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ai-task-builder-page .ai-device-table-row {
+    grid-template-columns: 42px minmax(0, 1.2fr) minmax(0, 1fr) 90px 110px 132px;
   }
 
   .ai-device-modal-grid {

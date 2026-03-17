@@ -153,6 +153,9 @@ export function TaskBuilder({
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesLoadError, setDevicesLoadError] = useState("");
   const [deviceSearch, setDeviceSearch] = useState("");
+  const [deviceTableSearch, setDeviceTableSearch] = useState("");
+  const [deviceStatusFilter, setDeviceStatusFilter] = useState<"all" | "online" | "offline">("all");
+  const [checkedDeviceKeys, setCheckedDeviceKeys] = useState<string[]>([]);
   const [regionModalOpen, setRegionModalOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [saving, setSaving] = useState(false);
@@ -162,7 +165,6 @@ export function TaskBuilder({
   const [activeDevicePreview, setActiveDevicePreview] = useState<DevicePreviewState | null>(null);
   const [activeDevicePreviewLoading, setActiveDevicePreviewLoading] = useState(false);
   const [activeDevicePreviewError, setActiveDevicePreviewError] = useState("");
-
   const customMessageSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -244,6 +246,28 @@ export function TaskBuilder({
       active = false;
     };
   }, [activeDevice]);
+
+  useEffect(() => {
+    setCheckedDeviceKeys((current) => current.filter((key) => selectedDevices.some((device) => deviceKey(device) === key)));
+    if (selectedDevices.length > 0 && !selectedDevices.some((item) => deviceKey(item) === activeDeviceCode)) {
+      setActiveDeviceCode(deviceKey(selectedDevices[0]));
+    }
+    if (selectedDevices.length === 0 && activeDeviceCode) {
+      setActiveDeviceCode("");
+    }
+  }, [activeDeviceCode, selectedDevices]);
+
+  const visibleSelectedDevices = useMemo(() => {
+    const keyword = deviceTableSearch.trim();
+    return selectedDevices.filter((device) => {
+      if (deviceStatusFilter !== "all" && device.status !== deviceStatusFilter) return false;
+      if (!keyword) return true;
+      return device.name.includes(keyword) || device.groupName.includes(keyword) || device.qrCode.includes(keyword);
+    });
+  }, [deviceStatusFilter, deviceTableSearch, selectedDevices]);
+
+  const allVisibleDeviceKeys = useMemo(() => visibleSelectedDevices.map((device) => deviceKey(device)), [visibleSelectedDevices]);
+  const allVisibleChecked = allVisibleDeviceKeys.length > 0 && allVisibleDeviceKeys.every((key) => checkedDeviceKeys.includes(key));
 
   async function ensureDevicesLoaded() {
     if (allDevices.length > 0 || devicesLoading) return;
@@ -366,6 +390,7 @@ export function TaskBuilder({
     );
     setSelectedDevices(nextDevices);
     setActiveDeviceCode(nextDevices[0] ? deviceKey(nextDevices[0]) : "");
+    setCheckedDeviceKeys([]);
     setDeviceModalOpen(false);
   }
 
@@ -373,7 +398,19 @@ export function TaskBuilder({
     const next = selectedDevices.filter((item) => deviceKey(item) !== targetKey);
     setSelectedDevices(next);
     setPendingDeviceCodes(next.map((item) => deviceKey(item)));
+    setCheckedDeviceKeys((current) => current.filter((key) => key !== targetKey));
     if (activeDeviceCode === targetKey) {
+      setActiveDeviceCode(next[0] ? deviceKey(next[0]) : "");
+    }
+  }
+
+  function removeCheckedDevices() {
+    if (checkedDeviceKeys.length === 0) return;
+    const next = selectedDevices.filter((item) => !checkedDeviceKeys.includes(deviceKey(item)));
+    setSelectedDevices(next);
+    setPendingDeviceCodes(next.map((item) => deviceKey(item)));
+    setCheckedDeviceKeys([]);
+    if (!next.some((item) => deviceKey(item) === activeDeviceCode)) {
       setActiveDeviceCode(next[0] ? deviceKey(next[0]) : "");
     }
   }
@@ -654,6 +691,123 @@ export function TaskBuilder({
               </div>
             ) : (
               <>
+                <div className="ai-device-table-panel">
+                  <div className="ai-device-toolbar">
+                    <div className="ai-device-toolbar-left">
+                      <button type="button" className="ai-button ai-button-light ai-device-toolbar-button" onClick={() => void openDeviceModal()}>
+                        <Plus size={14} strokeWidth={2} />
+                        <span>添加设备</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-button ai-button-light ai-device-toolbar-button"
+                        disabled={checkedDeviceKeys.length === 0}
+                        onClick={removeCheckedDevices}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <div className="ai-device-toolbar-right">
+                      <label className="ai-device-toolbar-filter">
+                        <span>设备状态</span>
+                        <select className="ai-input" value={deviceStatusFilter} onChange={(event) => setDeviceStatusFilter(event.target.value as "all" | "online" | "offline")}>
+                          <option value="all">全部</option>
+                          <option value="online">在线</option>
+                          <option value="offline">离线</option>
+                        </select>
+                      </label>
+                      <label className="ai-device-toolbar-search">
+                        <input
+                          className="ai-input"
+                          value={deviceTableSearch}
+                          onChange={(event) => setDeviceTableSearch(event.target.value)}
+                          placeholder="设备名称/所属分组"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="ai-device-table-shell">
+                    <div className="ai-device-table-row ai-device-table-row-head">
+                      <div className="ai-device-table-check">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleChecked}
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              setCheckedDeviceKeys((current) => Array.from(new Set([...current, ...allVisibleDeviceKeys])));
+                              return;
+                            }
+                            setCheckedDeviceKeys((current) => current.filter((key) => !allVisibleDeviceKeys.includes(key)));
+                          }}
+                        />
+                      </div>
+                      <div>设备名称</div>
+                      <div>所属分组</div>
+                      <div>设备状态</div>
+                      <div>画面检测区域</div>
+                      <div>操作</div>
+                    </div>
+
+                    <div className="ai-device-table-body">
+                      {visibleSelectedDevices.length === 0 ? (
+                        <div className="ai-device-table-empty">暂无符合条件的巡检设备</div>
+                      ) : (
+                        visibleSelectedDevices.map((device) => {
+                          const key = deviceKey(device);
+                          const regionCount = (regionsByQrCode[device.qrCode] ?? []).length;
+                          const isChecked = checkedDeviceKeys.includes(key);
+
+                          return (
+                            <div key={key} className={cn("ai-device-table-row", activeDeviceCode === key && "ai-device-table-row-active")}>
+                              <div className="ai-device-table-check">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(event) => {
+                                    setCheckedDeviceKeys((current) =>
+                                      event.target.checked ? Array.from(new Set([...current, key])) : current.filter((item) => item !== key)
+                                    );
+                                  }}
+                                />
+                              </div>
+                              <div className="ai-device-table-name" onClick={() => setActiveDeviceCode(key)}>
+                                {device.name}
+                              </div>
+                              <div className="ai-device-table-group">{device.groupName}</div>
+                              <div className="ai-device-table-status">
+                                <span className={device.status === "online" ? "ai-device-status ai-device-status-online" : "ai-device-status"}>
+                                  {device.status === "online" ? "在线" : "离线"}
+                                </span>
+                              </div>
+                              <div className="ai-device-table-region">{regionCount > 0 ? "特定检测区域" : "全画面"}</div>
+                              <div className="ai-device-table-actions">
+                                <button
+                                  type="button"
+                                  className="ai-text-button"
+                                  onClick={() => removeDevice(key)}
+                                >
+                                  删除
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ai-text-button"
+                                  onClick={() => {
+                                    setActiveDeviceCode(key);
+                                    setRegionModalOpen(true);
+                                  }}
+                                >
+                                  设置检测区域
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="ai-device-layout">
                   <div className="ai-device-list">
                     <div className="ai-device-list-head">
