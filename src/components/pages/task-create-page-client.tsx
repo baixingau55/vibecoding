@@ -69,6 +69,21 @@ export function TaskCreatePageClient({
     };
   }, [initialPayload]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch("/api/tasks/device-options", {
+      cache: "force-cache",
+      signal: controller.signal
+    }).catch(() => {
+      // Device options are warmed opportunistically; the modal handles failures locally.
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
   if (!payload && !error) {
     return <TaskDetailSkeleton />;
   }
