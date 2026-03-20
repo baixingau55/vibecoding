@@ -12,7 +12,7 @@ const getCachedAlgorithms = unstable_cache(
     }
   },
   ["tplink-algorithms"],
-  { revalidate: 15, tags: [CACHE_TAGS.algorithms] }
+  { revalidate: 60, tags: [CACHE_TAGS.algorithms] }
 );
 
 export async function getAlgorithms() {

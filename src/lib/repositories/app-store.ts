@@ -25,9 +25,10 @@ import type {
 import { getMemoryStore } from "@/lib/repositories/memory-store";
 
 const INITIAL_BALANCE_ID = "default";
-const READ_CACHE_TTL_MS = 5_000;
-const SCHEMA_CACHE_TTL_MS = 30_000;
-const BASE_ROWS_CACHE_TTL_MS = 30_000;
+const READ_CACHE_TTL_MS = 30_000;
+const SCHEMA_CACHE_TTL_MS = 60_000;
+const BASE_ROWS_CACHE_TTL_MS = 60_000;
+const COMPLETED_RUN_COUNT_TTL_MS = 60_000;
 const FALLBACK_DEVICE_PREVIEW =
   "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 
@@ -357,17 +358,24 @@ function toMediaByMessage(media: MediaAsset[]) {
 }
 
 async function getCompletedRunCountMap(client: NonNullable<ReturnType<typeof getSupabaseAdminClient>>) {
-  const { data, error } = await client.from("inspection_runs").select("task_id,status");
-  if (error) {
-    throw error;
-  }
+  return withReadCache(
+    "tasks:completed-run-counts",
+    async () => {
+      const { data, error } = await client
+        .from("inspection_runs")
+        .select("task_id,status")
+        .or("status.eq.completed,status.eq.partial_success");
+      if (error) {
+        throw error;
+      }
 
-  return (data ?? []).reduce<Record<string, number>>((accumulator, row) => {
-    if (row.status === "completed" || row.status === "partial_success") {
-      accumulator[row.task_id] = (accumulator[row.task_id] ?? 0) + 1;
-    }
-    return accumulator;
-  }, {});
+      return (data ?? []).reduce<Record<string, number>>((accumulator, row) => {
+        accumulator[row.task_id] = (accumulator[row.task_id] ?? 0) + 1;
+        return accumulator;
+      }, {});
+    },
+    COMPLETED_RUN_COUNT_TTL_MS
+  );
 }
 
 async function hasSupabaseSchema() {
@@ -830,10 +838,7 @@ export async function getAppStore() {
     },
     async listTasksData() {
       return withReadCache("tasks:list", async () => {
-        const [liveDevices, completedRunCountMap] = await Promise.all([
-          fetchTpLinkDevices().catch(() => [] as DeviceRef[]),
-          getCompletedRunCountMap(client).catch(() => ({} as Record<string, number>))
-        ]);
+        const completedRunCountMap = await getCompletedRunCountMap(client).catch(() => ({} as Record<string, number>));
         const nestedRes = await client
           .from("inspection_tasks")
           .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
@@ -847,7 +852,6 @@ export async function getAppStore() {
             nestedRes.data.flatMap((row) => row.inspection_task_regions ?? [])
           ).map((task) => ({
             ...task,
-            devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices,
             completedRunCount: completedRunCountMap[task.id] ?? 0
           }));
         }
@@ -862,14 +866,12 @@ export async function getAppStore() {
         if (errors.length > 0) throw errors[0];
         return composeTasks(taskRes.data ?? [], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []).map((task) => ({
           ...task,
-          devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices,
           completedRunCount: completedRunCountMap[task.id] ?? 0
         }));
       });
     },
     async getTaskSummaryData(taskId: string) {
       return withReadCache(`task:${taskId}:summary`, async () => {
-        const liveDevices = await fetchTpLinkDevices().catch(() => [] as DeviceRef[]);
         const nestedRes = await client
           .from("inspection_tasks")
           .select("*, inspection_task_devices(*), inspection_task_schedules(*), inspection_task_regions(*)")
@@ -884,12 +886,7 @@ export async function getAppStore() {
             nestedRes.data.inspection_task_regions ?? []
           );
           const task = tasks[0] ?? null;
-          return task
-            ? {
-                ...task,
-                devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
-              }
-            : null;
+          return task ?? null;
         }
 
         const [taskRes, taskDeviceRes, taskScheduleRes, taskRegionRes] = await Promise.all([
@@ -905,12 +902,7 @@ export async function getAppStore() {
 
         const tasks = composeTasks([taskRes.data], taskDeviceRes.data ?? [], taskScheduleRes.data ?? [], taskRegionRes.data ?? []);
         const task = tasks[0] ?? null;
-        return task
-          ? {
-              ...task,
-              devices: liveDevices.length > 0 ? reconcileTaskDevicesWithLiveDevices(task.devices, liveDevices) : task.devices
-            }
-          : null;
+        return task ?? null;
       });
     },
     async getTaskRunsData(taskId: string) {

@@ -665,7 +665,7 @@ const getCachedTaskList = unstable_cache(
     return snapshot.tasks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   },
   ["task-list"],
-  { revalidate: 5, tags: [CACHE_TAGS.tasks] }
+  { revalidate: 30, tags: [CACHE_TAGS.tasks] }
 );
 
 export async function listTasks() {
@@ -807,7 +807,7 @@ const getCachedTaskById = unstable_cache(
     };
   },
   ["task-detail"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
+  { revalidate: 30, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
 );
 
 export async function getTaskById(id: string) {
@@ -824,7 +824,7 @@ const getCachedTaskSummary = unstable_cache(
     return detail?.task ?? null;
   },
   ["task-detail-summary"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+  { revalidate: 30, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
 );
 
 export async function getTaskSummary(id: string) {
@@ -896,7 +896,7 @@ const getCachedTaskRuns = unstable_cache(
     return detail?.runs ?? [];
   },
   ["task-detail-runs"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+  { revalidate: 30, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
 );
 
 export async function getTaskRuns(id: string) {
@@ -913,7 +913,7 @@ const getCachedTaskResults = unstable_cache(
     return detail?.results ?? [];
   },
   ["task-detail-results"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
+  { revalidate: 15, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks, CACHE_TAGS.messages] }
 );
 
 export async function getTaskResults(id: string) {
@@ -930,7 +930,7 @@ const getCachedTaskFailures = unstable_cache(
     return detail?.failures ?? [];
   },
   ["task-detail-failures"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
+  { revalidate: 15, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.tasks] }
 );
 
 export async function getTaskFailures(id: string) {
@@ -954,7 +954,7 @@ const getCachedTaskMessages = unstable_cache(
     return { messages, media, mediaByMessage };
   },
   ["task-detail-messages"],
-  { revalidate: 5, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.messages, CACHE_TAGS.tasks] }
+  { revalidate: 15, tags: [CACHE_TAGS.taskDetail, CACHE_TAGS.messages, CACHE_TAGS.tasks] }
 );
 
 export async function getTaskMessages(id: string) {

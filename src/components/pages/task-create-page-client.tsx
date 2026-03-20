@@ -34,11 +34,21 @@ async function fetchCreatePayload() {
   };
 }
 
-export function TaskCreatePageClient({ selectedAlgorithmId }: { selectedAlgorithmId?: string }) {
-  const [payload, setPayload] = useState<CreatePayload | null>(null);
+export function TaskCreatePageClient({
+  selectedAlgorithmId,
+  initialPayload
+}: {
+  selectedAlgorithmId?: string;
+  initialPayload?: CreatePayload | null;
+}) {
+  const [payload, setPayload] = useState<CreatePayload | null>(initialPayload ?? null);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (initialPayload) {
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -57,7 +67,7 @@ export function TaskCreatePageClient({ selectedAlgorithmId }: { selectedAlgorith
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialPayload]);
 
   if (!payload && !error) {
     return <TaskDetailSkeleton />;

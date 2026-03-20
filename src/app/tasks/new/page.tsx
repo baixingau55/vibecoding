@@ -1,4 +1,5 @@
 import { TaskCreatePageClient } from "@/components/pages/task-create-page-client";
+import { getAlgorithms } from "@/lib/domain/algorithms";
 
 export default async function TaskCreatePage({
   searchParams
@@ -6,5 +7,15 @@ export default async function TaskCreatePage({
   searchParams: Promise<{ algorithmId?: string }>;
 }) {
   const { algorithmId } = await searchParams;
-  return <TaskCreatePageClient selectedAlgorithmId={algorithmId} />;
+  const algorithms = await getAlgorithms();
+
+  return (
+    <TaskCreatePageClient
+      selectedAlgorithmId={algorithmId}
+      initialPayload={{
+        algorithms,
+        devices: []
+      }}
+    />
+  );
 }

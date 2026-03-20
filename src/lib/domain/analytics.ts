@@ -231,7 +231,7 @@ const getCachedAnalyticsPayload = unstable_cache(
   };
   },
   ["analytics-payload"],
-  { revalidate: 5, tags: [CACHE_TAGS.analytics] }
+  { revalidate: 20, tags: [CACHE_TAGS.analytics] }
 );
 
 export async function getAnalyticsPayload() {

@@ -17,7 +17,7 @@ const getCachedBalance = unstable_cache(
     return snapshot.serviceBalance;
   },
   ["service-balance"],
-  { revalidate: 5, tags: [CACHE_TAGS.balance] }
+  { revalidate: 30, tags: [CACHE_TAGS.balance] }
 );
 
 const getCachedPurchaseHistory = unstable_cache(
@@ -30,7 +30,7 @@ const getCachedPurchaseHistory = unstable_cache(
     return snapshot.purchaseRecords;
   },
   ["purchase-history"],
-  { revalidate: 5, tags: [CACHE_TAGS.balance] }
+  { revalidate: 30, tags: [CACHE_TAGS.balance] }
 );
 
 export async function getServiceBalance() {

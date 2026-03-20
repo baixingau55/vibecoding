@@ -7,10 +7,16 @@ import { MessageCenter } from "@/components/messages/message-center";
 import type { MediaAsset, MessageItem } from "@/lib/types";
 import { readJsonResponse } from "@/lib/utils";
 
-export function MessagesPageClient() {
-  const [payload, setPayload] = useState<{ messages: MessageItem[]; mediaByMessage: Record<string, MediaAsset[]> } | null>(null);
+type MessagesPagePayload = { messages: MessageItem[]; mediaByMessage: Record<string, MediaAsset[]> };
+
+export function MessagesPageClient({ initialPayload }: { initialPayload?: MessagesPagePayload | null }) {
+  const [payload, setPayload] = useState<MessagesPagePayload | null>(initialPayload ?? null);
 
   useEffect(() => {
+    if (initialPayload) {
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -27,7 +33,7 @@ export function MessagesPageClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialPayload]);
 
   if (!payload) {
     return <MessagesPageSkeleton />;

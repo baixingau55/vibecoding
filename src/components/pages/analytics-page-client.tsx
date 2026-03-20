@@ -14,10 +14,14 @@ type AnalyticsPayload = {
   taskTrends: TaskTrendSeries[];
 };
 
-export function AnalyticsPageClient() {
-  const [payload, setPayload] = useState<AnalyticsPayload | null>(null);
+export function AnalyticsPageClient({ initialPayload }: { initialPayload?: AnalyticsPayload | null }) {
+  const [payload, setPayload] = useState<AnalyticsPayload | null>(initialPayload ?? null);
 
   useEffect(() => {
+    if (initialPayload) {
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -30,7 +34,7 @@ export function AnalyticsPageClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialPayload]);
 
   if (!payload) {
     return <AnalyticsPageSkeleton />;

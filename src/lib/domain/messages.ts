@@ -53,7 +53,30 @@ const getCachedMessages = unstable_cache(
     return snapshot.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
   ["messages-list"],
-  { revalidate: 5, tags: [CACHE_TAGS.messages] }
+  { revalidate: 20, tags: [CACHE_TAGS.messages] }
+);
+
+const getCachedMessagePayload = unstable_cache(
+  async () => {
+    const store = await getAppStore();
+    const payload =
+      "getMessagesData" in store && typeof store.getMessagesData === "function"
+        ? await store.getMessagesData()
+        : { messages: await getMessages(), media: (await store.snapshot(false)).media };
+
+    const mediaByMessage = payload.media.reduce<Record<string, MediaAsset[]>>((accumulator, media) => {
+      if (!media.messageId) return accumulator;
+      (accumulator[media.messageId] ??= []).push(media);
+      return accumulator;
+    }, {});
+
+    return {
+      messages: payload.messages.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      mediaByMessage
+    };
+  },
+  ["messages-page-data"],
+  { revalidate: 20, tags: [CACHE_TAGS.messages] }
 );
 
 const getCachedMessageById = unstable_cache(
@@ -67,11 +90,15 @@ const getCachedMessageById = unstable_cache(
     return snapshot.messages.find((item) => item.id === id) ?? null;
   },
   ["message-by-id"],
-  { revalidate: 5, tags: [CACHE_TAGS.messages] }
+  { revalidate: 20, tags: [CACHE_TAGS.messages] }
 );
 
 export async function getMessages() {
   return getCachedMessages();
+}
+
+export async function getMessagesPageData() {
+  return getCachedMessagePayload();
 }
 
 export async function getMessageById(id: string) {
