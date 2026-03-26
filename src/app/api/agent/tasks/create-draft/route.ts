@@ -16,12 +16,23 @@ function isAuthorized(request: NextRequest) {
   return bearer === env.agentApiToken;
 }
 
+async function parseRequestBody(request: NextRequest) {
+  const raw = await request.json().catch(() => ({}));
+  if (typeof raw !== "string") return raw;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const parsed = createDraftRequestSchema.safeParse(await request.json().catch(() => ({})));
+  const parsed = createDraftRequestSchema.safeParse(await parseRequestBody(request));
   if (!parsed.success) {
     return NextResponse.json({
       status: "error",
