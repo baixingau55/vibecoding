@@ -53,6 +53,7 @@ type AlgorithmCatalogItem = {
   name: string;
   latestVersion: string;
   keywords: string[];
+  aliases: string[];
   messageContent: string;
 };
 
@@ -117,6 +118,23 @@ function collectMatchTokens(value: string) {
   );
 }
 
+function buildAlgorithmAliases(algorithm: Algorithm, fallbackName?: string) {
+  return Array.from(
+    new Set(
+      [
+        algorithm.name,
+        fallbackName ?? "",
+        algorithm.id,
+        ...(algorithm.profileNames ?? []),
+        ...collectMatchTokens(algorithm.name),
+        ...collectMatchTokens(fallbackName ?? ""),
+        ...collectMatchTokens(algorithm.id),
+        ...(algorithm.profileNames ?? []).flatMap((value) => collectMatchTokens(value))
+      ].filter((value) => value.trim().length > 0)
+    )
+  );
+}
+
 function formatTime(hour: number, minute: number) {
   return `${`${hour}`.padStart(2, "0")}:${`${minute}`.padStart(2, "0")}`;
 }
@@ -146,12 +164,14 @@ async function getAlgorithmCatalog(): Promise<AlgorithmCatalogItem[]> {
 
   return algorithms.map((algorithm: Algorithm) => {
     const preset = ALGORITHM_PRESETS[algorithm.id];
+    const aliases = buildAlgorithmAliases(algorithm, preset?.fallbackName);
     return {
       id: algorithm.id,
       name: preset?.fallbackName ?? algorithm.name,
       latestVersion: algorithm.latestVersion,
-      keywords: Array.from(new Set([algorithm.id, ...(preset?.keywords ?? []), preset?.fallbackName ?? ""])).filter(Boolean),
-      messageContent: preset?.messageContent ?? `检测到${preset?.fallbackName ?? algorithm.name}异常`
+      keywords: Array.from(new Set([...aliases, ...(preset?.keywords ?? [])])).filter(Boolean),
+      aliases,
+      messageContent: preset?.messageContent ?? `?????${preset?.fallbackName ?? algorithm.name}???`
     };
   });
 }
@@ -163,6 +183,21 @@ function matchAlgorithm(rawUserQuery: string, algorithms: AlgorithmCatalogItem[]
 
   for (const algorithm of algorithms) {
     let score = 0;
+
+    for (const alias of algorithm.aliases) {
+      const normalizedAlias = normalizeText(alias);
+      if (!normalizedAlias) continue;
+
+      if (normalizedQuery === normalizedAlias) {
+        score = Math.max(score, normalizedAlias.length * 40);
+        continue;
+      }
+
+      if (normalizedQuery.includes(normalizedAlias)) {
+        score = Math.max(score, normalizedAlias.length * 25);
+      }
+    }
+
     for (const keyword of algorithm.keywords) {
       const normalizedKeyword = normalizeText(keyword);
       if (!normalizedKeyword) continue;
