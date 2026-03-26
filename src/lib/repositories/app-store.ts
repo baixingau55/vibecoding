@@ -8,6 +8,7 @@ import { slugId } from "@/lib/utils";
 import type {
   AppSnapshot,
   BalanceLedgerEntry,
+  CreateTaskConversationDraft,
   DeviceRef,
   InspectionFailure,
   InspectionResult,
@@ -1553,6 +1554,67 @@ export async function getAppStore() {
         { onConflict: "task_id,qr_code,algorithm_id,counter_date" }
       );
       if (error && !isMissingTableError(error) && !isMissingColumnError(error)) throw error;
+    },
+    async getCreateTaskDraft(conversationId: string) {
+      return withReadCache(`create-task-draft:${conversationId}`, async () => {
+        const { data, error } = await client
+          .from("create_task_conversation_drafts")
+          .select("*")
+          .eq("conversation_id", conversationId)
+          .maybeSingle();
+
+        if (error && isMissingTableError(error)) {
+          return getFallbackStore().getCreateTaskDraft(conversationId);
+        }
+        if (error) throw error;
+        if (!data) return null;
+
+        return {
+          conversationId: data.conversation_id,
+          taskName: data.task_name ?? undefined,
+          algorithmId: data.algorithm_id ?? undefined,
+          algorithmName: data.algorithm_name ?? undefined,
+          algorithmVersion: data.algorithm_version ?? undefined,
+          scheduleText: data.schedule_text ?? undefined,
+          schedules: data.schedules ?? [],
+          devices: data.devices ?? [],
+          inspectionRule: data.inspection_rule ?? undefined,
+          messageRule: data.message_rule ?? undefined,
+          updatedAt: data.updated_at ?? new Date().toISOString()
+        } satisfies CreateTaskConversationDraft;
+      });
+    },
+    async upsertCreateTaskDraft(draft: CreateTaskConversationDraft) {
+      invalidateReadCache();
+      const { error } = await client.from("create_task_conversation_drafts").upsert(
+        {
+          conversation_id: draft.conversationId,
+          task_name: draft.taskName ?? null,
+          algorithm_id: draft.algorithmId ?? null,
+          algorithm_name: draft.algorithmName ?? null,
+          algorithm_version: draft.algorithmVersion ?? null,
+          schedule_text: draft.scheduleText ?? null,
+          schedules: draft.schedules ?? [],
+          devices: draft.devices ?? [],
+          inspection_rule: draft.inspectionRule ?? null,
+          message_rule: draft.messageRule ?? null,
+          updated_at: draft.updatedAt
+        },
+        { onConflict: "conversation_id" }
+      );
+
+      if (error && isMissingTableError(error)) {
+        return getFallbackStore().upsertCreateTaskDraft(draft);
+      }
+      if (error) throw error;
+    },
+    async deleteCreateTaskDraft(conversationId: string) {
+      invalidateReadCache();
+      const { error } = await client.from("create_task_conversation_drafts").delete().eq("conversation_id", conversationId);
+      if (error && isMissingTableError(error)) {
+        return getFallbackStore().deleteCreateTaskDraft(conversationId);
+      }
+      if (error) throw error;
     },
     async addSchedulerScan(scan: SchedulerScan) {
       invalidateReadCache();

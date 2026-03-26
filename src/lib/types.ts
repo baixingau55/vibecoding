@@ -245,6 +245,20 @@ export interface MessageAlertCounter {
   lastAlertAt?: string;
 }
 
+export interface CreateTaskConversationDraft {
+  conversationId: string;
+  taskName?: string;
+  algorithmId?: string;
+  algorithmName?: string;
+  algorithmVersion?: string;
+  scheduleText?: string;
+  schedules?: InspectionSchedule[];
+  devices?: DeviceRef[];
+  inspectionRule?: InspectionRule;
+  messageRule?: MessageRule;
+  updatedAt: string;
+}
+
 export interface AppSnapshot {
   serviceBalance: ServiceBalance;
   purchaseRecords: PurchaseRecord[];

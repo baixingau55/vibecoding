@@ -199,6 +199,20 @@ create table if not exists message_alert_counters (
 create unique index if not exists message_alert_counters_identity_idx
   on message_alert_counters(task_id, qr_code, algorithm_id, counter_date);
 
+create table if not exists create_task_conversation_drafts (
+  conversation_id text primary key,
+  task_name text,
+  algorithm_id text,
+  algorithm_name text,
+  algorithm_version text,
+  schedule_text text,
+  schedules jsonb not null default '[]'::jsonb,
+  devices jsonb not null default '[]'::jsonb,
+  inspection_rule jsonb,
+  message_rule jsonb,
+  updated_at timestamptz not null default now()
+);
+
 alter table inspection_runs add column if not exists tplink_results_deleted_at timestamptz;
 alter table inspection_runs add column if not exists tplink_results_delete_error text;
 alter table inspection_results add column if not exists image_storage_path text;
@@ -216,3 +230,13 @@ alter table message_alert_counters add column if not exists consecutive_unqualif
 alter table message_alert_counters add column if not exists last_result text;
 alter table message_alert_counters add column if not exists last_alert_at timestamptz;
 alter table message_alert_counters add column if not exists updated_at timestamptz not null default now();
+alter table create_task_conversation_drafts add column if not exists task_name text;
+alter table create_task_conversation_drafts add column if not exists algorithm_id text;
+alter table create_task_conversation_drafts add column if not exists algorithm_name text;
+alter table create_task_conversation_drafts add column if not exists algorithm_version text;
+alter table create_task_conversation_drafts add column if not exists schedule_text text;
+alter table create_task_conversation_drafts add column if not exists schedules jsonb not null default '[]'::jsonb;
+alter table create_task_conversation_drafts add column if not exists devices jsonb not null default '[]'::jsonb;
+alter table create_task_conversation_drafts add column if not exists inspection_rule jsonb;
+alter table create_task_conversation_drafts add column if not exists message_rule jsonb;
+alter table create_task_conversation_drafts add column if not exists updated_at timestamptz not null default now();

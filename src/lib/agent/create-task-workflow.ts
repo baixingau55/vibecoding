@@ -1,36 +1,40 @@
-import { createMockSnapshot } from "@/lib/mock-data";
 import { getAlgorithms } from "@/lib/domain/algorithms";
-import { getAppSnapshot } from "@/lib/domain/store";
 import { upsertTask } from "@/lib/domain/tasks";
+import { createMockSnapshot } from "@/lib/mock-data";
+import { getAppStore } from "@/lib/repositories/app-store";
 import { dedupeDevicesByIdentity } from "@/lib/domain/device-reconciliation";
-import { slugId } from "@/lib/utils";
-import type { Algorithm, DeviceRef, InspectionRule, InspectionSchedule, MessageRule } from "@/lib/types";
+import type {
+  Algorithm,
+  CreateTaskConversationDraft,
+  DeviceRef,
+  InspectionRule,
+  InspectionSchedule,
+  MessageRule
+} from "@/lib/types";
 
 export type AgentUserAction = "cancel" | "confirm" | "continue";
 
 export type CreateTaskDraftRequest = {
+  conversationId: string;
   rawUserQuery: string;
   userAction: AgentUserAction;
-  draftId?: string;
-  draftState?: string;
 };
 
 export type CreateTaskDraftResponse = {
   status: "needs_more_info" | "ready_to_confirm" | "error";
-  draftId: string;
+  conversationId: string;
   suggestedReply: string;
-  draftState: string;
 };
 
 export type ConfirmCreateTaskRequest = {
+  conversationId: string;
   rawUserQuery: string;
   userAction: AgentUserAction;
-  draftId?: string;
-  draftState?: string;
 };
 
 export type ConfirmCreateTaskResponse = {
   status: "success" | "error";
+  conversationId: string;
   taskId: string;
   taskName: string;
   detailPath: string;
@@ -38,22 +42,9 @@ export type ConfirmCreateTaskResponse = {
   suggestedReply: string;
 };
 
-type CreateTaskDraftState = {
-  taskName?: string;
-  algorithmId?: string;
-  algorithmName?: string;
-  algorithmVersion?: string;
-  scheduleText?: string;
-  schedules?: InspectionSchedule[];
-  devices?: DeviceRef[];
-  inspectionRule?: InspectionRule;
-  messageRule?: MessageRule;
-};
-
 type AlgorithmPreset = {
-  id: string;
-  fallbackName: string;
   keywords: string[];
+  fallbackName: string;
   messageContent: string;
 };
 
@@ -71,27 +62,23 @@ const WEEKEND_REPEAT_DAYS = [0, 6];
 
 const ALGORITHM_PRESETS: Record<string, AlgorithmPreset> = {
   "away-from-post-detection": {
-    id: "away-from-post-detection",
     fallbackName: "离岗检测",
-    keywords: ["离岗", "空岗", "脱岗"],
+    keywords: ["离岗", "空岗", "脱岗", "在岗"],
     messageContent: "检测到离岗行为"
   },
   "smoking-detection": {
-    id: "smoking-detection",
     fallbackName: "吸烟检测",
     keywords: ["吸烟", "抽烟", "香烟"],
     messageContent: "检测到吸烟行为"
   },
   "helmet-detection": {
-    id: "helmet-detection",
     fallbackName: "安全帽检测",
-    keywords: ["安全帽", "未佩戴安全帽", "不戴安全帽"],
+    keywords: ["安全帽", "未戴安全帽", "没戴安全帽"],
     messageContent: "检测到未佩戴安全帽行为"
   },
   "vehicle-parking-detection-algorithm": {
-    id: "vehicle-parking-detection-algorithm",
     fallbackName: "停车检测",
-    keywords: ["停车", "车辆停放", "违停"],
+    keywords: ["停车", "违停", "停放"],
     messageContent: "检测到车辆停放行为"
   }
 };
@@ -118,7 +105,10 @@ const CHINESE_WEEKDAY_TO_NUMBER: Record<string, number> = {
 };
 
 function normalizeText(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "").replace(/[，。；、,.!！?？:：/\\\-()（）]/g, "");
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[，。；、,.!?？！（）()【】\[\]:'"“”‘’\-]/g, "");
 }
 
 function collectMatchTokens(value: string) {
@@ -149,23 +139,6 @@ function formatReadableDateTime(value: string) {
   return `${valueByType.year}-${valueByType.month}-${valueByType.day} ${valueByType.hour}:${valueByType.minute}`;
 }
 
-function serializeDraftState(draftState: CreateTaskDraftState) {
-  return JSON.stringify(draftState);
-}
-
-function parseDraftState(rawDraftState: string | undefined) {
-  if (!rawDraftState?.trim()) {
-    return {} as CreateTaskDraftState;
-  }
-
-  const parsed = JSON.parse(rawDraftState) as CreateTaskDraftState;
-  return {
-    ...parsed,
-    schedules: parsed.schedules ?? [],
-    devices: parsed.devices ?? []
-  };
-}
-
 async function getAlgorithmCatalog(): Promise<AlgorithmCatalogItem[]> {
   const liveAlgorithms = await getAlgorithms();
   const fallbackAlgorithms = createMockSnapshot().algorithms;
@@ -175,10 +148,10 @@ async function getAlgorithmCatalog(): Promise<AlgorithmCatalogItem[]> {
     const preset = ALGORITHM_PRESETS[algorithm.id];
     return {
       id: algorithm.id,
-      name: algorithm.name,
+      name: preset?.fallbackName ?? algorithm.name,
       latestVersion: algorithm.latestVersion,
-      keywords: Array.from(new Set([algorithm.name, algorithm.id, ...(preset?.keywords ?? [])])),
-      messageContent: preset?.messageContent ?? `检测到${algorithm.name}异常`
+      keywords: Array.from(new Set([algorithm.id, ...(preset?.keywords ?? []), preset?.fallbackName ?? ""])).filter(Boolean),
+      messageContent: preset?.messageContent ?? `检测到${preset?.fallbackName ?? algorithm.name}异常`
     };
   });
 }
@@ -190,7 +163,6 @@ function matchAlgorithm(rawUserQuery: string, algorithms: AlgorithmCatalogItem[]
 
   for (const algorithm of algorithms) {
     let score = 0;
-
     for (const keyword of algorithm.keywords) {
       const normalizedKeyword = normalizeText(keyword);
       if (!normalizedKeyword) continue;
@@ -198,10 +170,9 @@ function matchAlgorithm(rawUserQuery: string, algorithms: AlgorithmCatalogItem[]
         score = Math.max(score, normalizedKeyword.length * 10);
       }
     }
-
     if (score > bestScore) {
-      bestScore = score;
       bestMatch = algorithm;
+      bestScore = score;
     }
   }
 
@@ -209,17 +180,24 @@ function matchAlgorithm(rawUserQuery: string, algorithms: AlgorithmCatalogItem[]
 }
 
 function parseSchedule(rawUserQuery: string) {
-  const timeMatch = rawUserQuery.match(
-    /(早上|上午|中午|下午|晚上|傍晚)?\s*(\d{1,2})(?:(?:[:：](\d{1,2}))|(?:(?:点|时)(\d{1,2})?分?)|点半)/
-  );
+  const halfHourMatch = rawUserQuery.match(/(早上|上午|中午|下午|晚上|傍晚)?\s*(\d{1,2})点半/);
+  const timeMatch =
+    halfHourMatch ??
+    rawUserQuery.match(/(早上|上午|中午|下午|晚上|傍晚)?\s*(\d{1,2})(?:[:：](\d{1,2})|点(?:(\d{1,2})分?)?)?/);
+
   if (!timeMatch) return null;
 
   const period = timeMatch[1] ?? "";
   let hour = Number(timeMatch[2]);
   let minute = 0;
-  if (timeMatch[3]) minute = Number(timeMatch[3]);
-  if (timeMatch[4]) minute = Number(timeMatch[4]);
-  if (timeMatch[0].includes("点半")) minute = 30;
+
+  if (halfHourMatch) {
+    minute = 30;
+  } else {
+    if (timeMatch[3]) minute = Number(timeMatch[3]);
+    if (timeMatch[4]) minute = Number(timeMatch[4]);
+  }
+
   if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 23 || minute > 59) {
     return null;
   }
@@ -282,25 +260,43 @@ function matchDevices(rawUserQuery: string, devices: DeviceRef[]) {
 
   if (scored.length === 0) return [];
   const topScore = scored[0].score;
+
   return dedupeDevicesByIdentity(
     scored.filter((item) => item.score >= Math.max(10, topScore - 20)).map((item) => item.device)
   );
 }
 
 function extractExplicitTaskName(rawUserQuery: string) {
-  const match = rawUserQuery.match(/(?:叫|名为|命名为)([^，。；,;]+?)(?:任务|$)/);
+  const match = rawUserQuery.match(/(?:任务名为|命名为)([^，。；,;]+?)(?:任务|$)/);
   return match?.[1]?.trim() ?? "";
 }
 
-function deriveTaskName(draftState: CreateTaskDraftState) {
-  if (draftState.taskName?.trim()) return draftState.taskName.trim();
+function deriveTaskName(draft: Partial<CreateTaskConversationDraft>) {
+  if (draft.taskName?.trim()) return draft.taskName.trim();
 
-  const parts = [draftState.scheduleText?.trim(), draftState.algorithmName?.trim()].filter(Boolean);
+  const parts = [draft.scheduleText?.trim(), draft.algorithmName?.trim()].filter(Boolean);
   if (parts.length === 0) return "";
   return `${parts.join(" ")}任务`;
 }
 
-function buildSuggestedReplyForMissingFields(missingFields: string[]) {
+function buildDefaultMessageRule(algorithmName: string, messageContent: string): MessageRule {
+  return {
+    enabled: true,
+    triggerMode: "every_unqualified",
+    customMessageType: algorithmName,
+    customMessageContent: messageContent
+  };
+}
+
+function listMissingDraftFields(draft: Partial<CreateTaskConversationDraft>) {
+  const missingFields: string[] = [];
+  if (!draft.algorithmId) missingFields.push("algorithm");
+  if (!draft.schedules || draft.schedules.length === 0 || !draft.scheduleText) missingFields.push("schedule");
+  if (!draft.devices || draft.devices.length === 0) missingFields.push("device");
+  return missingFields;
+}
+
+function buildMissingFieldsReply(missingFields: string[]) {
   const labels = missingFields.map((field) => {
     switch (field) {
       case "algorithm":
@@ -314,104 +310,115 @@ function buildSuggestedReplyForMissingFields(missingFields: string[]) {
     }
   });
 
-  const suffixByField: Record<string, string> = {
-    algorithm: "想检查什么行为",
-    schedule: "希望什么时候执行",
-    device: "要检查哪些设备"
-  };
+  const followUps = missingFields.map((field) => {
+    switch (field) {
+      case "algorithm":
+        return "想检查什么行为";
+      case "schedule":
+        return "希望什么时候执行";
+      case "device":
+        return "要检查哪些设备";
+      default:
+        return "";
+    }
+  }).filter(Boolean);
 
-  const followUps = missingFields.map((field) => suffixByField[field]).filter(Boolean);
   return `还差${labels.join("、")}。${followUps.join("，")}？`;
 }
 
-function buildPreviewReply(draftState: CreateTaskDraftState) {
-  const deviceSummary = draftState.devices?.map((device) => device.name).join("、") ?? "未匹配设备";
-  return `我已经整理好待创建任务：任务名称：${draftState.taskName}；巡检目标：${draftState.algorithmName}；执行时间：${draftState.scheduleText}；检查设备：${deviceSummary}。若确认无误，请回复“确认创建”。`;
+function buildPreviewReply(draft: Partial<CreateTaskConversationDraft>) {
+  const deviceSummary = draft.devices?.map((device) => device.name).join("、") ?? "未匹配设备";
+  return `我已经整理好待创建任务：任务名称：${draft.taskName}；巡检目标：${draft.algorithmName}；执行时间：${draft.scheduleText}；检查设备：${deviceSummary}。若确认无误，请回复“确认创建”。`;
 }
 
-function buildDefaultMessageRule(algorithmName: string, messageContent: string): MessageRule {
+function createEmptyDraft(conversationId: string): CreateTaskConversationDraft {
   return {
-    enabled: true,
-    triggerMode: "every_unqualified",
-    customMessageType: algorithmName,
-    customMessageContent: messageContent
+    conversationId,
+    schedules: [],
+    devices: [],
+    updatedAt: new Date().toISOString()
   };
 }
 
-function listMissingDraftFields(draftState: CreateTaskDraftState) {
-  const missingFields: string[] = [];
-  if (!draftState.algorithmId) missingFields.push("algorithm");
-  if (!draftState.schedules || draftState.schedules.length === 0 || !draftState.scheduleText) missingFields.push("schedule");
-  if (!draftState.devices || draftState.devices.length === 0) missingFields.push("device");
-  return missingFields;
-}
-
-function validateCompleteDraftState(draftState: CreateTaskDraftState) {
-  const missingFields = listMissingDraftFields(draftState);
+function validateCompleteDraft(draft: Partial<CreateTaskConversationDraft>) {
+  const missingFields = listMissingDraftFields(draft);
   if (missingFields.length > 0) {
     return { ok: false as const, missingFields };
   }
-
   return { ok: true as const };
 }
 
 export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<CreateTaskDraftResponse> {
   try {
-    const snapshot = await getAppSnapshot({ includeDevices: true });
+    const store = await getAppStore();
+
+    if (input.userAction === "cancel") {
+      await store.deleteCreateTaskDraft(input.conversationId);
+      return {
+        status: "error",
+        conversationId: input.conversationId,
+        suggestedReply: "已取消本次创建任务。"
+      };
+    }
+
+    const snapshot = await store.snapshot(true);
     const algorithms = await getAlgorithmCatalog();
-    const draftState = parseDraftState(input.draftState);
+    const persistedDraft = await store.getCreateTaskDraft(input.conversationId);
+    const draft: CreateTaskConversationDraft = {
+      ...createEmptyDraft(input.conversationId),
+      ...(persistedDraft ?? {})
+    };
 
     const explicitTaskName = extractExplicitTaskName(input.rawUserQuery);
     if (explicitTaskName) {
-      draftState.taskName = explicitTaskName;
+      draft.taskName = explicitTaskName;
     }
 
     const matchedAlgorithm = matchAlgorithm(input.rawUserQuery, algorithms);
     if (matchedAlgorithm) {
-      draftState.algorithmId = matchedAlgorithm.id;
-      draftState.algorithmName = matchedAlgorithm.name;
-      draftState.algorithmVersion = matchedAlgorithm.latestVersion;
-      draftState.inspectionRule = { resultMode: "detect_target" };
-      draftState.messageRule = buildDefaultMessageRule(matchedAlgorithm.name, matchedAlgorithm.messageContent);
+      draft.algorithmId = matchedAlgorithm.id;
+      draft.algorithmName = matchedAlgorithm.name;
+      draft.algorithmVersion = matchedAlgorithm.latestVersion;
+      draft.inspectionRule = { resultMode: "detect_target" };
+      draft.messageRule = buildDefaultMessageRule(matchedAlgorithm.name, matchedAlgorithm.messageContent);
     }
 
     const matchedSchedule = parseSchedule(input.rawUserQuery);
     if (matchedSchedule) {
-      draftState.schedules = matchedSchedule.schedules;
-      draftState.scheduleText = matchedSchedule.scheduleText;
+      draft.schedules = matchedSchedule.schedules;
+      draft.scheduleText = matchedSchedule.scheduleText;
     }
 
     const matchedDevices = matchDevices(input.rawUserQuery, snapshot.devices);
     if (matchedDevices.length > 0) {
-      draftState.devices = matchedDevices;
+      draft.devices = matchedDevices;
     }
 
-    draftState.taskName = deriveTaskName(draftState);
-    const nextDraftId = input.draftId?.trim() || slugId("draft");
-    const missingFields = listMissingDraftFields(draftState);
+    draft.taskName = deriveTaskName(draft);
+    draft.updatedAt = new Date().toISOString();
+
+    const missingFields = listMissingDraftFields(draft);
+    await store.upsertCreateTaskDraft(draft);
 
     if (missingFields.length > 0) {
       return {
         status: "needs_more_info",
-        draftId: nextDraftId,
-        suggestedReply: buildSuggestedReplyForMissingFields(missingFields),
-        draftState: serializeDraftState(draftState)
+        conversationId: input.conversationId,
+        suggestedReply: buildMissingFieldsReply(missingFields)
       };
     }
 
     return {
       status: "ready_to_confirm",
-      draftId: nextDraftId,
-      suggestedReply: buildPreviewReply(draftState),
-      draftState: serializeDraftState(draftState)
+      conversationId: input.conversationId,
+      suggestedReply: buildPreviewReply(draft)
     };
   } catch (error) {
     console.error("[agent/tasks/create-draft] failed to build draft", error);
     return {
       status: "error",
-      draftId: "",
-      suggestedReply: "任务草稿生成失败，请稍后重试。",
-      draftState: ""
+      conversationId: input.conversationId,
+      suggestedReply: "任务草稿生成失败，请稍后重试。"
     };
   }
 }
@@ -421,6 +428,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     if (input.userAction !== "confirm") {
       return {
         status: "error",
+        conversationId: input.conversationId,
         taskId: "",
         taskName: "",
         detailPath: "",
@@ -429,22 +437,25 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
       };
     }
 
-    if (!input.draftId?.trim() || !input.draftState?.trim()) {
+    const store = await getAppStore();
+    const draft = await store.getCreateTaskDraft(input.conversationId);
+    if (!draft) {
       return {
         status: "error",
+        conversationId: input.conversationId,
         taskId: "",
         taskName: "",
         detailPath: "",
         nextRunAt: "",
-        suggestedReply: "任务创建失败，请检查配置后重试。"
+        suggestedReply: "未找到待确认的任务草稿，请先描述要创建的任务。"
       };
     }
 
-    const draftState = parseDraftState(input.draftState);
-    const validation = validateCompleteDraftState(draftState);
+    const validation = validateCompleteDraft(draft);
     if (!validation.ok) {
       return {
         status: "error",
+        conversationId: input.conversationId,
         taskId: "",
         taskName: "",
         detailPath: "",
@@ -454,17 +465,19 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     }
 
     const task = await upsertTask({
-      name: deriveTaskName(draftState),
-      algorithmIds: [draftState.algorithmId!],
-      algorithmVersions: { [draftState.algorithmId!]: draftState.algorithmVersion ?? "latest" },
-      devices: draftState.devices ?? [],
-      schedules: draftState.schedules ?? [],
-      inspectionRule: draftState.inspectionRule ?? { resultMode: "detect_target" },
+      name: deriveTaskName(draft),
+      algorithmIds: [draft.algorithmId!],
+      algorithmVersions: { [draft.algorithmId!]: draft.algorithmVersion ?? "latest" },
+      devices: draft.devices ?? [],
+      schedules: draft.schedules ?? [],
+      inspectionRule: draft.inspectionRule ?? ({ resultMode: "detect_target" } satisfies InspectionRule),
       messageRule:
-        draftState.messageRule ??
-        buildDefaultMessageRule(draftState.algorithmName ?? draftState.algorithmId!, "检测到异常行为"),
+        draft.messageRule ??
+        buildDefaultMessageRule(draft.algorithmName ?? draft.algorithmId!, "检测到异常行为"),
       regionsByQrCode: {}
     });
+
+    await store.deleteCreateTaskDraft(input.conversationId);
 
     const detailPath = `/tasks/${task.id}`;
     const nextRunAt = task.nextRunAt ?? "";
@@ -472,6 +485,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
 
     return {
       status: "success",
+      conversationId: input.conversationId,
       taskId: task.id,
       taskName: task.name,
       detailPath,
@@ -482,6 +496,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     console.error("[agent/tasks/confirm-create] failed to create task", error);
     return {
       status: "error",
+      conversationId: input.conversationId,
       taskId: "",
       taskName: "",
       detailPath: "",

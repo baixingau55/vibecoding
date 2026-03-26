@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { POST as createDraftPOST } from "@/app/api/agent/tasks/create-draft/route";
 import { POST as confirmCreatePOST } from "@/app/api/agent/tasks/confirm-create/route";
+import { POST as createDraftPOST } from "@/app/api/agent/tasks/create-draft/route";
 import { createMockSnapshot } from "@/lib/mock-data";
 import { getMemoryStore } from "@/lib/repositories/memory-store";
 
@@ -22,65 +22,72 @@ describe("agent create task APIs", () => {
     getMemoryStore().replace(createMockSnapshot());
   });
 
-  it("returns needs_more_info when schedule and device are missing", async () => {
-    const response = await createDraftPOST(
+  it("keeps accumulating draft state across rounds for the same conversation", async () => {
+    const conversationId = "conv_multi_round";
+
+    const first = await createDraftPOST(
       buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
         rawUserQuery: "帮我创建一个离岗巡检任务",
-        userAction: "continue",
-        draftId: "",
-        draftState: ""
+        userAction: "continue"
       })
     );
+    const firstPayload = await first.json();
+    expect(firstPayload.status).toBe("needs_more_info");
 
-    const payload = await response.json();
+    const second = await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "周四早上9点执行",
+        userAction: "continue"
+      })
+    );
+    const secondPayload = await second.json();
+    expect(secondPayload.status).toBe("needs_more_info");
 
-    expect(payload.status).toBe("needs_more_info");
-    expect(payload.draftId).toMatch(/^draft_/);
-    expect(payload.suggestedReply).toContain("执行时间");
-    expect(payload.suggestedReply).toContain("设备范围");
-
-    const draftState = JSON.parse(payload.draftState);
-    expect(draftState.algorithmId).toBe("away-from-post-detection");
+    const third = await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "检查全部设备",
+        userAction: "continue"
+      })
+    );
+    const thirdPayload = await third.json();
+    expect(thirdPayload.status).toBe("ready_to_confirm");
+    expect(thirdPayload.conversationId).toBe(conversationId);
+    expect(thirdPayload.suggestedReply).toContain("确认创建");
   });
 
-  it("returns ready_to_confirm when query includes algorithm schedule and device", async () => {
-    const response = await createDraftPOST(
+  it("creates a task after a complete multi-round draft is confirmed", async () => {
+    const conversationId = "conv_confirm";
+
+    await createDraftPOST(
       buildRequest("http://localhost/api/agent/tasks/create-draft", {
-        rawUserQuery: "帮我创建一个每天早上9点执行的离岗巡检任务，检查A01",
-        userAction: "continue",
-        draftId: "",
-        draftState: ""
+        conversationId,
+        rawUserQuery: "帮我创建一个离岗巡检任务",
+        userAction: "continue"
       })
     );
-
-    const payload = await response.json();
-
-    expect(payload.status).toBe("ready_to_confirm");
-    expect(payload.suggestedReply).toContain("确认创建");
-
-    const draftState = JSON.parse(payload.draftState);
-    expect(draftState.algorithmId).toBe("away-from-post-detection");
-    expect(draftState.scheduleText).toBe("每天 09:00");
-    expect(draftState.devices).toHaveLength(1);
-  });
-
-  it("creates a task from a confirmed draft", async () => {
-    const draftResponse = await createDraftPOST(
+    await createDraftPOST(
       buildRequest("http://localhost/api/agent/tasks/create-draft", {
-        rawUserQuery: "帮我创建一个每天早上9点执行的离岗巡检任务，检查A01",
-        userAction: "continue",
-        draftId: "",
-        draftState: ""
+        conversationId,
+        rawUserQuery: "周四早上9点执行",
+        userAction: "continue"
       })
     );
-    const draftPayload = await draftResponse.json();
+    await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "检查全部设备",
+        userAction: "continue"
+      })
+    );
 
     const response = await confirmCreatePOST(
       buildRequest("http://localhost/api/agent/tasks/confirm-create", {
+        conversationId,
         rawUserQuery: "确认创建",
-        userAction: "confirm",
-        draftId: draftPayload.draftId,
-        draftState: draftPayload.draftState
+        userAction: "confirm"
       })
     );
 
@@ -92,23 +99,77 @@ describe("agent create task APIs", () => {
     expect(payload.taskId).toMatch(/^task_/);
     expect(payload.detailPath).toBe(`/tasks/${payload.taskId}`);
     expect(task?.algorithmIds).toEqual(["away-from-post-detection"]);
-    expect(task?.devices).toHaveLength(1);
+    expect(task?.devices.length).toBeGreaterThan(0);
     expect(task?.schedules[0]?.startTime).toBe("09:00");
   });
 
-  it("rejects confirm-create when userAction is not confirm", async () => {
-    const response = await confirmCreatePOST(
-      buildRequest("http://localhost/api/agent/tasks/confirm-create", {
-        rawUserQuery: "继续吧",
-        userAction: "continue",
-        draftId: "draft_123",
-        draftState: "{\"taskName\":\"test\"}"
+  it("deletes draft state when the user cancels", async () => {
+    const conversationId = "conv_cancel";
+
+    await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "帮我创建一个离岗巡检任务",
+        userAction: "continue"
       })
     );
 
-    const payload = await response.json();
+    const cancelResponse = await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "算了不建了",
+        userAction: "cancel"
+      })
+    );
+    const cancelPayload = await cancelResponse.json();
+    expect(cancelPayload.status).toBe("error");
 
-    expect(payload.status).toBe("error");
-    expect(payload.suggestedReply).toContain("确认");
+    const confirmResponse = await confirmCreatePOST(
+      buildRequest("http://localhost/api/agent/tasks/confirm-create", {
+        conversationId,
+        rawUserQuery: "确认创建",
+        userAction: "confirm"
+      })
+    );
+    const confirmPayload = await confirmResponse.json();
+    expect(confirmPayload.status).toBe("error");
+    expect(confirmPayload.suggestedReply).toContain("未找到");
+  });
+
+  it("clears the draft after successful creation", async () => {
+    const conversationId = "conv_cleanup";
+
+    await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "帮我创建一个离岗巡检任务",
+        userAction: "continue"
+      })
+    );
+    await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        conversationId,
+        rawUserQuery: "周四早上9点执行，检查全部设备",
+        userAction: "continue"
+      })
+    );
+    await confirmCreatePOST(
+      buildRequest("http://localhost/api/agent/tasks/confirm-create", {
+        conversationId,
+        rawUserQuery: "确认创建",
+        userAction: "confirm"
+      })
+    );
+
+    const retryResponse = await confirmCreatePOST(
+      buildRequest("http://localhost/api/agent/tasks/confirm-create", {
+        conversationId,
+        rawUserQuery: "确认创建",
+        userAction: "confirm"
+      })
+    );
+    const retryPayload = await retryResponse.json();
+    expect(retryPayload.status).toBe("error");
+    expect(retryPayload.suggestedReply).toContain("未找到");
   });
 });

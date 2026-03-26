@@ -2,6 +2,7 @@ import { createMockSnapshot } from "@/lib/mock-data";
 import type {
   AppSnapshot,
   BalanceLedgerEntry,
+  CreateTaskConversationDraft,
   InspectionFailure,
   InspectionResult,
   InspectionRun,
@@ -17,6 +18,8 @@ import type {
 declare global {
   // eslint-disable-next-line no-var
   var __AI_XUNJIAN_STORE__: AppSnapshot | undefined;
+  // eslint-disable-next-line no-var
+  var __AI_XUNJIAN_CREATE_TASK_DRAFTS__: Record<string, CreateTaskConversationDraft> | undefined;
 }
 
 function clone<T>(value: T): T {
@@ -32,6 +35,10 @@ export function getMemoryStore() {
   if (!store.messageAlertCounters) {
     store.messageAlertCounters = [];
   }
+  if (!global.__AI_XUNJIAN_CREATE_TASK_DRAFTS__) {
+    global.__AI_XUNJIAN_CREATE_TASK_DRAFTS__ = {};
+  }
+  const createTaskDrafts = global.__AI_XUNJIAN_CREATE_TASK_DRAFTS__;
 
   return {
     snapshot(_includeDevices = true) {
@@ -39,6 +46,7 @@ export function getMemoryStore() {
     },
     replace(snapshot: AppSnapshot) {
       global.__AI_XUNJIAN_STORE__ = clone(snapshot);
+      global.__AI_XUNJIAN_CREATE_TASK_DRAFTS__ = {};
     },
     setBalance(balance: ServiceBalance) {
       store.serviceBalance = clone(balance);
@@ -145,6 +153,15 @@ export function getMemoryStore() {
       } else {
         store.messageAlertCounters?.unshift(clone(counter));
       }
+    },
+    getCreateTaskDraft(conversationId: string) {
+      return clone(createTaskDrafts[conversationId] ?? null);
+    },
+    upsertCreateTaskDraft(draft: CreateTaskConversationDraft) {
+      createTaskDrafts[draft.conversationId] = clone(draft);
+    },
+    deleteCreateTaskDraft(conversationId: string) {
+      delete createTaskDrafts[conversationId];
     }
   };
 }

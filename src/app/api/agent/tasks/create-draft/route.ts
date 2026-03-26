@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import env from "@/lib/env";
 import { createTaskDraft } from "@/lib/agent/create-task-workflow";
+import env from "@/lib/env";
 
 const createDraftRequestSchema = z.object({
+  conversationId: z.string().trim().min(1),
   rawUserQuery: z.string().trim().min(1),
-  userAction: z.enum(["cancel", "confirm", "continue"]).default("continue"),
-  draftId: z.string().optional().default(""),
-  draftState: z.string().optional().default("")
+  userAction: z.enum(["cancel", "confirm", "continue"]).default("continue")
 });
 
 function isAuthorized(request: NextRequest) {
@@ -26,9 +25,8 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({
       status: "error",
-      draftId: "",
-      suggestedReply: "任务草稿生成失败，请稍后重试。",
-      draftState: ""
+      conversationId: "",
+      suggestedReply: "任务草稿生成失败，请稍后重试。"
     });
   }
 

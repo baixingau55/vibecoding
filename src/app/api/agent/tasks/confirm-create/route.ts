@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import env from "@/lib/env";
 import { confirmCreateTask } from "@/lib/agent/create-task-workflow";
+import env from "@/lib/env";
 
 const confirmCreateRequestSchema = z.object({
+  conversationId: z.string().trim().min(1),
   rawUserQuery: z.string().trim().min(1),
-  userAction: z.enum(["cancel", "confirm", "continue"]),
-  draftId: z.string().optional().default(""),
-  draftState: z.string().optional().default("")
+  userAction: z.enum(["cancel", "confirm", "continue"])
 });
 
 function isAuthorized(request: NextRequest) {
@@ -26,6 +25,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({
       status: "error",
+      conversationId: "",
       taskId: "",
       taskName: "",
       detailPath: "",
