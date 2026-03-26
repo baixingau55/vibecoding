@@ -43,7 +43,8 @@ const env = {
   supabaseInspectionMediaBucket: process.env.SUPABASE_INSPECTION_MEDIA_BUCKET ?? "inspection-media",
   appBaseUrl: process.env.APP_BASE_URL ?? "http://localhost:3000",
   tpLinkMessageSignSecret: process.env.TP_LINK_MESSAGE_SIGN_SECRET ?? "",
-  internalAdminToken: process.env.INTERNAL_ADMIN_TOKEN ?? ""
+  internalAdminToken: process.env.INTERNAL_ADMIN_TOKEN ?? "",
+  agentApiToken: process.env.AGENT_API_TOKEN ?? process.env.INTERNAL_ADMIN_TOKEN ?? ""
 };
 
 export function hasTpLinkEnv() {
