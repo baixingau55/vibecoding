@@ -18,13 +18,39 @@ function isAuthorized(request: NextRequest) {
 
 async function parseRequestBody(request: NextRequest) {
   const raw = await request.json().catch(() => ({}));
-  if (typeof raw !== "string") return raw;
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
   }
+
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+
+    if (typeof record.data === "string") {
+      try {
+        return JSON.parse(record.data);
+      } catch {
+        return {};
+      }
+    }
+
+    if (
+      record.body &&
+      typeof record.body === "object" &&
+      typeof (record.body as Record<string, unknown>).data === "string"
+    ) {
+      try {
+        return JSON.parse((record.body as Record<string, unknown>).data as string);
+      } catch {
+        return {};
+      }
+    }
+  }
+
+  return raw;
 }
 
 export async function POST(request: NextRequest) {
