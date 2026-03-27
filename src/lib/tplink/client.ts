@@ -117,6 +117,8 @@ interface TpLinkProjectDeviceItem {
   deviceStatus?: number;
   channelId?: number;
   regionName?: string;
+  parentQrCode?: string | null;
+  parentMac?: string | null;
 }
 
 interface TpLinkEntrustDeviceItem {
@@ -138,12 +140,12 @@ function mapTpLinkDeviceStatus(value: number | undefined): DeviceRef["status"] {
 }
 
 function mapProjectDevice(item: TpLinkProjectDeviceItem, profile: TpLinkProfile): DeviceRef | null {
-  const qrCode = item.qrCode?.trim();
+  const qrCode = item.parentQrCode?.trim() || item.qrCode?.trim();
   if (!qrCode) return null;
 
   return {
     qrCode,
-    mac: item.mac,
+    mac: item.parentMac?.trim() || item.mac?.trim(),
     channelId: item.channelId ?? 1,
     name: normalizeText(item.deviceName, qrCode),
     status: mapTpLinkDeviceStatus(item.deviceStatus),
@@ -171,8 +173,8 @@ function mapEntrustDevice(item: TpLinkEntrustDeviceItem, profile: TpLinkProfile,
   };
 }
 
-function buildFetchedDeviceKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId">) {
-  return `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
+function buildFetchedDeviceKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId" | "mac">) {
+  return `${device.profileId ?? "unknown"}:${device.mac?.trim() || device.qrCode}:${device.channelId}`;
 }
 
 export async function fetchTpLinkAlgorithms() {
@@ -246,13 +248,7 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
           let total = Number.POSITIVE_INFINITY;
 
           while (start < total) {
-            const response = await tpLinkPostForProfile<TpLinkListResponse<TpLinkProjectDeviceItem>>(profile, path, {
-              start,
-              limit,
-              filterAnd: {
-                hasChild: 1
-              }
-            });
+            const response = await tpLinkPostForProfile<TpLinkListResponse<TpLinkProjectDeviceItem>>(profile, path, { start, limit });
 
             if (response.error_code !== 0) {
               throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);

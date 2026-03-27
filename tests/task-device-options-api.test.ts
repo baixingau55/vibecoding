@@ -42,10 +42,8 @@ describe("task device options API", () => {
       }
     ];
 
-    vi.doMock("@/lib/repositories/app-store", () => ({
-      getAppStore: async () => ({
-        snapshot: async () => ({ devices })
-      })
+    vi.doMock("@/lib/tplink/client", () => ({
+      fetchTpLinkDevices: async () => devices
     }));
 
     const { GET } = await import("@/app/api/tasks/device-options/route");
