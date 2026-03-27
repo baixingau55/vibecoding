@@ -18,6 +18,13 @@ export type CreateTaskDraftRequest = {
   conversationId: string;
   rawUserQuery: string;
   userAction: AgentUserAction;
+  taskName?: string;
+  algorithmId?: string;
+  algorithmName?: string;
+  algorithmVersion?: string;
+  scheduleText?: string;
+  schedules?: InspectionSchedule[];
+  deviceQrCodes?: string[];
 };
 
 export type CreateTaskDraftResponse = {
@@ -383,6 +390,17 @@ function validateCompleteDraft(draft: Partial<CreateTaskConversationDraft>) {
   return { ok: true as const };
 }
 
+function findAlgorithmById(algorithmId: string, algorithms: AlgorithmCatalogItem[]) {
+  return algorithms.find((algorithm) => algorithm.id === algorithmId);
+}
+
+function findDevicesByQrCodes(deviceQrCodes: string[] | undefined, devices: DeviceRef[]) {
+  if (!deviceQrCodes || deviceQrCodes.length === 0) return [];
+
+  const qrCodeSet = new Set(deviceQrCodes.map((value) => value.trim()).filter(Boolean));
+  return dedupeDevicesByIdentity(devices.filter((device) => qrCodeSet.has(device.qrCode)));
+}
+
 export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<CreateTaskDraftResponse> {
   try {
     const store = await getAppStore();
@@ -404,29 +422,58 @@ export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<Cr
       ...(persistedDraft ?? {})
     };
 
+    if (input.taskName?.trim()) {
+      draft.taskName = input.taskName.trim();
+    }
+
+    const structuredAlgorithm = input.algorithmId ? findAlgorithmById(input.algorithmId, algorithms) : null;
+    if (structuredAlgorithm) {
+      draft.algorithmId = structuredAlgorithm.id;
+      draft.algorithmName = input.algorithmName?.trim() || structuredAlgorithm.name;
+      draft.algorithmVersion = input.algorithmVersion?.trim() || structuredAlgorithm.latestVersion;
+      draft.inspectionRule = { resultMode: "detect_target" };
+      draft.messageRule = buildDefaultMessageRule(draft.algorithmName, structuredAlgorithm.messageContent);
+    }
+
+    if (input.schedules && input.schedules.length > 0) {
+      draft.schedules = input.schedules;
+      draft.scheduleText = input.scheduleText?.trim() || draft.scheduleText;
+    }
+
+    const structuredDevices = findDevicesByQrCodes(input.deviceQrCodes, snapshot.devices);
+    if (structuredDevices.length > 0) {
+      draft.devices = structuredDevices;
+    }
+
     const explicitTaskName = extractExplicitTaskName(input.rawUserQuery);
     if (explicitTaskName) {
       draft.taskName = explicitTaskName;
     }
 
-    const matchedAlgorithm = matchAlgorithm(input.rawUserQuery, algorithms);
-    if (matchedAlgorithm) {
-      draft.algorithmId = matchedAlgorithm.id;
-      draft.algorithmName = matchedAlgorithm.name;
-      draft.algorithmVersion = matchedAlgorithm.latestVersion;
-      draft.inspectionRule = { resultMode: "detect_target" };
-      draft.messageRule = buildDefaultMessageRule(matchedAlgorithm.name, matchedAlgorithm.messageContent);
+    if (!draft.algorithmId) {
+      const matchedAlgorithm = matchAlgorithm(input.rawUserQuery, algorithms);
+      if (matchedAlgorithm) {
+        draft.algorithmId = matchedAlgorithm.id;
+        draft.algorithmName = matchedAlgorithm.name;
+        draft.algorithmVersion = matchedAlgorithm.latestVersion;
+        draft.inspectionRule = { resultMode: "detect_target" };
+        draft.messageRule = buildDefaultMessageRule(matchedAlgorithm.name, matchedAlgorithm.messageContent);
+      }
     }
 
-    const matchedSchedule = parseSchedule(input.rawUserQuery);
-    if (matchedSchedule) {
-      draft.schedules = matchedSchedule.schedules;
-      draft.scheduleText = matchedSchedule.scheduleText;
+    if ((!draft.schedules || draft.schedules.length === 0) && !draft.scheduleText) {
+      const matchedSchedule = parseSchedule(input.rawUserQuery);
+      if (matchedSchedule) {
+        draft.schedules = matchedSchedule.schedules;
+        draft.scheduleText = matchedSchedule.scheduleText;
+      }
     }
 
-    const matchedDevices = matchDevices(input.rawUserQuery, snapshot.devices);
-    if (matchedDevices.length > 0) {
-      draft.devices = matchedDevices;
+    if (!draft.devices || draft.devices.length === 0) {
+      const matchedDevices = matchDevices(input.rawUserQuery, snapshot.devices);
+      if (matchedDevices.length > 0) {
+        draft.devices = matchedDevices;
+      }
     }
 
     draft.taskName = deriveTaskName(draft);

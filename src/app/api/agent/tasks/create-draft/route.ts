@@ -7,7 +7,24 @@ import env from "@/lib/env";
 const createDraftRequestSchema = z.object({
   conversationId: z.string().trim().min(1),
   rawUserQuery: z.string().trim().min(1),
-  userAction: z.enum(["cancel", "confirm", "continue"]).default("continue")
+  userAction: z.enum(["cancel", "confirm", "continue"]).default("continue"),
+  taskName: z.string().trim().optional(),
+  algorithmId: z.string().trim().optional(),
+  algorithmName: z.string().trim().optional(),
+  algorithmVersion: z.string().trim().optional(),
+  scheduleText: z.string().trim().optional(),
+  schedules: z
+    .array(
+      z.object({
+        type: z.enum(["time_point", "time_range"]),
+        startTime: z.string().trim().min(1),
+        endTime: z.string().trim().optional(),
+        repeatDays: z.array(z.number().int().min(0).max(6)),
+        intervalMinutes: z.number().int().positive().optional()
+      })
+    )
+    .optional(),
+  deviceQrCodes: z.array(z.string().trim().min(1)).optional()
 });
 
 function isAuthorized(request: NextRequest) {
