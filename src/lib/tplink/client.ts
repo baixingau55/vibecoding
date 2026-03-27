@@ -226,68 +226,59 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
   }
 
   deviceListInFlight = (async () => {
-  const endpoints = [
-    "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
-    "/tums/open/deviceManager/v1/getDeviceListInProjectApplication"
-  ] as const;
-  const profiles = getTpLinkProfiles();
-  const merged = new Map<string, DeviceRef>();
-  let lastError: Error | null = null;
+    const endpoints = [
+      "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
+      "/tums/open/deviceManager/v1/getDeviceListInProjectApplication"
+    ] as const;
+    const profiles = getTpLinkProfiles();
+    const merged = new Map<string, DeviceRef>();
+    let lastError: Error | null = null;
 
-  for (const profile of profiles) {
-    let fetchedForProfile = false;
+    for (const profile of profiles) {
+      for (const path of endpoints) {
+        try {
+          const limit = 100;
+          let start = 0;
+          let total = Number.POSITIVE_INFINITY;
 
-    for (const path of endpoints) {
-      try {
-        const limit = 100;
-        let start = 0;
-        let total = Number.POSITIVE_INFINITY;
+          while (start < total) {
+            const response = await tpLinkPostForProfile<TpLinkListResponse<TpLinkProjectDeviceItem>>(profile, path, {
+              start,
+              limit,
+              filterAnd: {
+                hasChild: 1
+              }
+            });
 
-        while (start < total) {
-          const response = await tpLinkPostForProfile<TpLinkListResponse<TpLinkProjectDeviceItem>>(profile, path, {
-            start,
-            limit,
-            filterAnd: {
-              hasChild: 1
+            if (response.error_code !== 0) {
+              throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
             }
-          });
 
-          if (response.error_code !== 0) {
-            throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
-          }
+            const list = response.result.list ?? [];
+            total = response.result.total ?? list.length;
 
-          const list = response.result.list ?? [];
-          total = response.result.total ?? list.length;
-
-          for (const item of list) {
-            const device = mapProjectDevice(item, profile);
-            if (device) {
-              merged.set(`${device.profileId}:${device.qrCode}`, device);
+            for (const item of list) {
+              const device = mapProjectDevice(item, profile);
+              if (device) {
+                merged.set(`${device.profileId}:${device.qrCode}`, device);
+              }
             }
-          }
 
-          if (list.length < limit) {
-            break;
-          }
+            if (list.length < limit) {
+              break;
+            }
 
-          start += limit;
+            start += limit;
+          }
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
         }
-
-        fetchedForProfile = true;
-        break;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
       }
     }
 
-    if (!fetchedForProfile) {
-      continue;
+    if (merged.size === 0 && lastError) {
+      throw lastError;
     }
-  }
-
-  if (merged.size === 0 && lastError) {
-    throw lastError;
-  }
 
     const devices = Array.from(merged.values());
     cachedDeviceList = devices;
