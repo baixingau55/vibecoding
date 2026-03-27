@@ -5,7 +5,8 @@ import { confirmCreateTask } from "@/lib/agent/create-task-workflow";
 import env from "@/lib/env";
 
 const confirmCreateRequestSchema = z.object({
-  conversationId: z.string().trim().min(1),
+  conversationId: z.string().trim().min(1).optional(),
+  ownerKey: z.string().trim().min(1).optional(),
   rawUserQuery: z.string().trim().min(1),
   userAction: z.enum(["cancel", "confirm", "continue"])
 });

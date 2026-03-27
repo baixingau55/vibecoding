@@ -4,8 +4,33 @@ import { z } from "zod";
 import { createTaskDraft } from "@/lib/agent/create-task-workflow";
 import env from "@/lib/env";
 
+const stringArraySchema = z.preprocess((value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return value;
+}, z.array(z.string().trim().min(1)));
+
+const repeatDaysSchema = z.preprocess((value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => Number(item));
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => !Number.isNaN(item));
+  }
+  return value;
+}, z.array(z.number().int().min(0).max(6)));
+
 const createDraftRequestSchema = z.object({
-  conversationId: z.string().trim().min(1),
+  conversationId: z.string().trim().min(1).optional(),
+  ownerKey: z.string().trim().min(1).optional(),
   rawUserQuery: z.string().trim().min(1),
   userAction: z.enum(["cancel", "confirm", "continue"]).default("continue"),
   taskName: z.string().trim().optional(),
@@ -19,12 +44,12 @@ const createDraftRequestSchema = z.object({
         type: z.enum(["time_point", "time_range"]),
         startTime: z.string().trim().min(1),
         endTime: z.string().trim().optional(),
-        repeatDays: z.array(z.number().int().min(0).max(6)),
-        intervalMinutes: z.number().int().positive().optional()
+        repeatDays: repeatDaysSchema,
+        intervalMinutes: z.coerce.number().int().positive().optional()
       })
     )
     .optional(),
-  deviceQrCodes: z.array(z.string().trim().min(1)).optional()
+  deviceQrCodes: stringArraySchema.optional()
 });
 
 function isAuthorized(request: NextRequest) {

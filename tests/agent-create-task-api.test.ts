@@ -172,4 +172,34 @@ describe("agent create task APIs", () => {
     expect(retryPayload.status).toBe("error");
     expect(retryPayload.suggestedReply).toContain("未找到");
   });
+  it("uses the default open draft when no conversationId is provided", async () => {
+    const first = await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        rawUserQuery: "甯垜鍒涘缓涓€涓宀楀贰妫€浠诲姟",
+        userAction: "continue"
+      })
+    );
+    const firstPayload = await first.json();
+    expect(firstPayload.status).toBe("needs_more_info");
+    expect(firstPayload.conversationId).toBe("global-agent-create-task");
+
+    const second = await createDraftPOST(
+      buildRequest("http://localhost/api/agent/tasks/create-draft", {
+        rawUserQuery: "鍛ㄥ洓鏃╀笂9鐐规墽琛岋紝妫€鏌ュ叏閮ㄨ澶?,
+        userAction: "continue"
+      })
+    );
+    const secondPayload = await second.json();
+    expect(secondPayload.status).toBe("ready_to_confirm");
+
+    const confirm = await confirmCreatePOST(
+      buildRequest("http://localhost/api/agent/tasks/confirm-create", {
+        rawUserQuery: "纭鍒涘缓",
+        userAction: "confirm"
+      })
+    );
+    const confirmPayload = await confirm.json();
+    expect(confirmPayload.status).toBe("success");
+    expect(confirmPayload.conversationId).toBe("global-agent-create-task");
+  });
 });

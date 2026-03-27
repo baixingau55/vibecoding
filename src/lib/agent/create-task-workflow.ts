@@ -15,7 +15,8 @@ import type {
 export type AgentUserAction = "cancel" | "confirm" | "continue";
 
 export type CreateTaskDraftRequest = {
-  conversationId: string;
+  conversationId?: string;
+  ownerKey?: string;
   rawUserQuery: string;
   userAction: AgentUserAction;
   taskName?: string;
@@ -34,7 +35,8 @@ export type CreateTaskDraftResponse = {
 };
 
 export type ConfirmCreateTaskRequest = {
-  conversationId: string;
+  conversationId?: string;
+  ownerKey?: string;
   rawUserQuery: string;
   userAction: AgentUserAction;
 };
@@ -67,6 +69,7 @@ type AlgorithmCatalogItem = {
 const EVERYDAY_REPEAT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const WORKDAY_REPEAT_DAYS = [1, 2, 3, 4, 5];
 const WEEKEND_REPEAT_DAYS = [0, 6];
+const DEFAULT_AGENT_DRAFT_OWNER_KEY = "global-agent-create-task";
 
 const ALGORITHM_PRESETS: Record<string, AlgorithmPreset> = {
   "away-from-post-detection": {
@@ -382,6 +385,10 @@ function createEmptyDraft(conversationId: string): CreateTaskConversationDraft {
   };
 }
 
+function resolveDraftKey(input: { conversationId?: string; ownerKey?: string }) {
+  return input.ownerKey?.trim() || input.conversationId?.trim() || DEFAULT_AGENT_DRAFT_OWNER_KEY;
+}
+
 function validateCompleteDraft(draft: Partial<CreateTaskConversationDraft>) {
   const missingFields = listMissingDraftFields(draft);
   if (missingFields.length > 0) {
@@ -404,21 +411,22 @@ function findDevicesByQrCodes(deviceQrCodes: string[] | undefined, devices: Devi
 export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<CreateTaskDraftResponse> {
   try {
     const store = await getAppStore();
+    const draftKey = resolveDraftKey(input);
 
     if (input.userAction === "cancel") {
-      await store.deleteCreateTaskDraft(input.conversationId);
+      await store.deleteCreateTaskDraft(draftKey);
       return {
         status: "error",
-        conversationId: input.conversationId,
+        conversationId: draftKey,
         suggestedReply: "已取消本次创建任务。"
       };
     }
 
     const snapshot = await store.snapshot(true);
     const algorithms = await getAlgorithmCatalog();
-    const persistedDraft = await store.getCreateTaskDraft(input.conversationId);
+    const persistedDraft = await store.getCreateTaskDraft(draftKey);
     const draft: CreateTaskConversationDraft = {
-      ...createEmptyDraft(input.conversationId),
+      ...createEmptyDraft(draftKey),
       ...(persistedDraft ?? {})
     };
 
@@ -485,21 +493,21 @@ export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<Cr
     if (missingFields.length > 0) {
       return {
         status: "needs_more_info",
-        conversationId: input.conversationId,
+        conversationId: draftKey,
         suggestedReply: buildMissingFieldsReply(missingFields)
       };
     }
 
     return {
       status: "ready_to_confirm",
-      conversationId: input.conversationId,
+      conversationId: draftKey,
       suggestedReply: buildPreviewReply(draft)
     };
   } catch (error) {
     console.error("[agent/tasks/create-draft] failed to build draft", error);
     return {
       status: "error",
-      conversationId: input.conversationId,
+      conversationId: resolveDraftKey(input),
       suggestedReply: "任务草稿生成失败，请稍后重试。"
     };
   }
@@ -507,10 +515,11 @@ export async function createTaskDraft(input: CreateTaskDraftRequest): Promise<Cr
 
 export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promise<ConfirmCreateTaskResponse> {
   try {
+    const draftKey = resolveDraftKey(input);
     if (input.userAction !== "confirm") {
       return {
         status: "error",
-        conversationId: input.conversationId,
+        conversationId: draftKey,
         taskId: "",
         taskName: "",
         detailPath: "",
@@ -520,11 +529,11 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     }
 
     const store = await getAppStore();
-    const draft = await store.getCreateTaskDraft(input.conversationId);
+    const draft = await store.getCreateTaskDraft(draftKey);
     if (!draft) {
       return {
         status: "error",
-        conversationId: input.conversationId,
+        conversationId: draftKey,
         taskId: "",
         taskName: "",
         detailPath: "",
@@ -537,7 +546,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     if (!validation.ok) {
       return {
         status: "error",
-        conversationId: input.conversationId,
+        conversationId: draftKey,
         taskId: "",
         taskName: "",
         detailPath: "",
@@ -559,7 +568,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
       regionsByQrCode: {}
     });
 
-    await store.deleteCreateTaskDraft(input.conversationId);
+    await store.deleteCreateTaskDraft(draftKey);
 
     const detailPath = `/tasks/${task.id}`;
     const nextRunAt = task.nextRunAt ?? "";
@@ -567,7 +576,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
 
     return {
       status: "success",
-      conversationId: input.conversationId,
+      conversationId: draftKey,
       taskId: task.id,
       taskName: task.name,
       detailPath,
@@ -578,7 +587,7 @@ export async function confirmCreateTask(input: ConfirmCreateTaskRequest): Promis
     console.error("[agent/tasks/confirm-create] failed to create task", error);
     return {
       status: "error",
-      conversationId: input.conversationId,
+      conversationId: resolveDraftKey(input),
       taskId: "",
       taskName: "",
       detailPath: "",
