@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import { PencilLine, Plus, Trash2, X } from "lucide-react";
 
 import { RegionEditor } from "@/components/tasks/region-editor";
+import { deviceCompositeKey } from "@/lib/domain/device-reconciliation";
 import type { Algorithm, DeviceRef, InspectionSchedule, InspectionTask, MessageRule, RegionShape } from "@/lib/types";
 import { cn, readJsonResponse } from "@/lib/utils";
 
-function deviceKey(device: Pick<DeviceRef, "qrCode" | "channelId" | "profileId">) {
-  return `${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`;
+function deviceKey(device: Pick<DeviceRef, "qrCode" | "channelId" | "profileId" | "mac">) {
+  return deviceCompositeKey(device);
 }
 
 const repeatOptions = [

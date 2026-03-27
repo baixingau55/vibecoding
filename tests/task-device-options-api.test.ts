@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { deviceCompositeKey } from "@/lib/domain/device-reconciliation";
 import type { DeviceRef } from "@/lib/types";
 
 describe("task device options API", () => {
@@ -8,40 +9,47 @@ describe("task device options API", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns the live TP-LINK snapshot and keeps additional channels", async () => {
+  it("returns the live TP-LINK snapshot and keeps NVR channel devices separate from the parent NVR", async () => {
     const devices: DeviceRef[] = [
       {
-        qrCode: "device-001",
+        qrCode: "nvr-001",
+        mac: "00-FF-00-00-00-AA",
         channelId: 1,
-        name: "North Gate",
+        name: "NVR-0002",
         status: "online",
         groupName: "Project A",
         previewImage: "https://example.com/1.jpg",
         profileId: "primary",
         profileName: "Primary",
-        source: "device_application"
-      },
-      {
-        qrCode: "device-001",
-        channelId: 2,
-        name: "North Gate",
-        status: "online",
-        groupName: "Project A",
-        previewImage: "https://example.com/2.jpg",
-        profileId: "primary",
-        profileName: "Primary",
-        source: "device_application_child"
-      },
-      {
-        qrCode: "device-001",
-        channelId: 2,
-        name: "North Gate",
-        status: "online",
-        groupName: "Project A",
-        previewImage: "https://example.com/2.jpg",
-        profileId: "primary",
-        profileName: "Primary",
         source: "project_application"
+      },
+      {
+        qrCode: "nvr-001",
+        mac: "00-FF-00-00-00-01",
+        channelId: 1,
+        name: "NVRNVR",
+        status: "offline",
+        groupName: "Project A",
+        previewImage: "https://example.com/2.jpg",
+        profileId: "primary",
+        profileName: "Primary",
+        parentQrCode: "nvr-001",
+        parentMac: "00-FF-00-00-00-AA",
+        source: "project_application_child"
+      },
+      {
+        qrCode: "nvr-001",
+        mac: "00-FF-00-00-00-02",
+        channelId: 2,
+        name: "IPCIPC",
+        status: "offline",
+        groupName: "Project A",
+        previewImage: "https://example.com/3.jpg",
+        profileId: "primary",
+        profileName: "Primary",
+        parentQrCode: "nvr-001",
+        parentMac: "00-FF-00-00-00-AA",
+        source: "project_application_child"
       }
     ];
 
@@ -53,7 +61,11 @@ describe("task device options API", () => {
     const response = await GET();
     const payload = await response.json();
 
-    expect(payload.devices).toHaveLength(2);
-    expect(payload.devices.map((device: DeviceRef) => `${device.qrCode}:${device.channelId}`)).toEqual(["device-001:1", "device-001:2"]);
+    expect(payload.devices).toHaveLength(3);
+    expect(payload.devices.map((device: DeviceRef) => deviceCompositeKey(device))).toEqual([
+      "primary:nvr-001:1:00-FF-00-00-00-AA",
+      "primary:nvr-001:1:00-FF-00-00-00-01",
+      "primary:nvr-001:2:00-FF-00-00-00-02"
+    ]);
   });
 });

@@ -74,8 +74,9 @@ export function reconcileDevice(source: DeviceRef, candidates: DeviceRef[], pref
   };
 }
 
-export function deviceCompositeKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId">) {
-  return `${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`;
+export function deviceCompositeKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId" | "mac">) {
+  const baseKey = `${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`;
+  return device.mac ? `${baseKey}:${device.mac}` : baseKey;
 }
 
 export function dedupeDevicesByIdentity(devices: DeviceRef[]) {

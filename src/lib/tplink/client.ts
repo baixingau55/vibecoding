@@ -7,6 +7,7 @@ const TP_LINK_ENDPOINT = `https://${TP_LINK_HOST}`;
 const DEVICE_PREVIEW_IMAGE =
   "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80";
 const DEVICE_CACHE_TTL_MS = 60 * 1000;
+const TP_LINK_APPLICATION_NOT_DEVICE_TYPE = -88311;
 
 let cachedDeviceList: DeviceRef[] | null = null;
 let cachedDeviceListAt = 0;
@@ -137,6 +138,7 @@ const DEVICE_SOURCE_PRIORITY: Record<TpLinkDeviceSource, number> = {
   device_application: 1,
   entrust: 2,
   project_application: 3,
+  project_application_child: 4,
   device_application_child: 4
 };
 
@@ -278,16 +280,18 @@ function mergeFetchedDevice(left: DeviceRef, right: DeviceRef): DeviceRef {
   };
 }
 
-function findExactFetchedDeviceIndex(devices: DeviceRef[], candidate: DeviceRef) {
-  return devices.findIndex((device) => {
-    if ((device.profileId ?? "") !== (candidate.profileId ?? "")) return false;
-    if (device.channelId !== candidate.channelId) return false;
+function buildFetchedDeviceIdentityKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId" | "mac" | "parentQrCode" | "source">) {
+  const profileId = device.profileId ?? "primary";
 
-    return (
-      (Boolean(device.qrCode) && device.qrCode === candidate.qrCode) ||
-      (Boolean(device.mac) && Boolean(candidate.mac) && device.mac === candidate.mac)
-    );
-  });
+  if (device.source === "project_application_child" && device.parentQrCode && device.mac) {
+    return `${profileId}:project-child:${device.parentQrCode}:${device.channelId}:${device.mac}`;
+  }
+
+  if (device.mac) {
+    return `${profileId}:default:${device.qrCode}:${device.channelId}:${device.mac}`;
+  }
+
+  return `${profileId}:default:${device.qrCode}:${device.channelId}`;
 }
 
 function isCrossSourceDuplicate(left: DeviceRef, right: DeviceRef) {
@@ -301,21 +305,22 @@ function isCrossSourceDuplicate(left: DeviceRef, right: DeviceRef) {
 }
 
 function dedupeFetchedDevices(devices: DeviceRef[]) {
-  const exactMerged: DeviceRef[] = [];
+  const exactMerged = new Map<string, DeviceRef>();
 
   for (const device of devices) {
-    const existingIndex = findExactFetchedDeviceIndex(exactMerged, device);
-    if (existingIndex === -1) {
-      exactMerged.push(device);
+    const identityKey = buildFetchedDeviceIdentityKey(device);
+    const existing = exactMerged.get(identityKey);
+    if (!existing) {
+      exactMerged.set(identityKey, device);
       continue;
     }
 
-    exactMerged[existingIndex] = mergeFetchedDevice(exactMerged[existingIndex], device);
+    exactMerged.set(identityKey, mergeFetchedDevice(existing, device));
   }
 
   const crossSourceMerged: DeviceRef[] = [];
 
-  for (const device of exactMerged) {
+  for (const device of exactMerged.values()) {
     const existingIndex = crossSourceMerged.findIndex((item) => isCrossSourceDuplicate(item, device));
     if (existingIndex === -1) {
       crossSourceMerged.push(device);
@@ -332,7 +337,8 @@ async function fetchPagedDeviceSource<T>(
   profile: TpLinkProfile,
   path: string,
   buildPayload: (start: number, limit: number) => Record<string, unknown>,
-  mapItem: (item: T, profile: TpLinkProfile) => DeviceRef | null
+  mapItem: (item: T, profile: TpLinkProfile) => DeviceRef | null,
+  ignoredErrorCodes: number[] = []
 ) {
   const devices: DeviceRef[] = [];
   let start = 0;
@@ -342,6 +348,9 @@ async function fetchPagedDeviceSource<T>(
     const response = await tpLinkPostForProfile<TpLinkListResponse<T>>(profile, path, buildPayload(start, TP_LINK_DEVICE_PAGE_SIZE));
 
     if (response.error_code !== 0) {
+      if (ignoredErrorCodes.includes(response.error_code)) {
+        return [];
+      }
       throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
     }
 
@@ -431,7 +440,8 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
             profile,
             "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
             (start, limit) => ({ start, limit }),
-            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application")
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application"),
+            [TP_LINK_APPLICATION_NOT_DEVICE_TYPE]
           ))
         );
       } catch (error) {
@@ -448,7 +458,8 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
               limit,
               filterAnd: { hasChild: 1 }
             }),
-            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application_child")
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application_child"),
+            [TP_LINK_APPLICATION_NOT_DEVICE_TYPE]
           ))
         );
       } catch (error) {
@@ -462,6 +473,23 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
             "/tums/open/deviceManager/v1/getDeviceListInProjectApplication",
             (start, limit) => ({ start, limit }),
             (item, currentProfile) => mapProjectDevice(item, currentProfile, "project_application")
+          ))
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
+      }
+
+      try {
+        allDevices.push(
+          ...(await fetchPagedDeviceSource<TpLinkProjectDeviceItem>(
+            profile,
+            "/tums/open/deviceManager/v1/getDeviceListInProjectApplication",
+            (start, limit) => ({
+              start,
+              limit,
+              filterAnd: { hasChild: 1 }
+            }),
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "project_application_child")
           ))
         );
       } catch (error) {

@@ -73,7 +73,7 @@ export function TaskCreatePageClient({
     const controller = new AbortController();
 
     fetch("/api/tasks/device-options", {
-      cache: "force-cache",
+      cache: "no-store",
       signal: controller.signal
     }).catch(() => {
       // Device options are warmed opportunistically; the modal handles failures locally.

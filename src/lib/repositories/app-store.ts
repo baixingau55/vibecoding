@@ -1,6 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 
-import { dedupeDevicesByIdentity, filterCandidatesForDevice, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
+import { dedupeDevicesByIdentity, deviceCompositeKey, filterCandidatesForDevice, getPreferredProfileId, reconcileDevice } from "@/lib/domain/device-reconciliation";
 import env from "@/lib/env";
 import { fetchTpLinkDeviceByQrCode, fetchTpLinkDevices } from "@/lib/tplink/client";
 import { getSupabaseAdminClient } from "@/lib/supabase/client";
@@ -234,7 +234,7 @@ function composeTasks(
 
   for (const task of tasksById.values()) {
     task.devices = Array.from(
-      new Map(task.devices.map((device) => [`${device.profileId ?? "primary"}:${device.qrCode}:${device.channelId}`, device] as const)).values()
+      new Map(task.devices.map((device) => [deviceCompositeKey(device), device] as const)).values()
     );
     task.schedules = Array.from(
       new Map(
@@ -494,19 +494,19 @@ async function ensureBaseRows() {
 
 async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   const merged = new Map<string, DeviceRef>();
-  taskDevices.forEach((device) => merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device));
+  taskDevices.forEach((device) => merged.set(deviceCompositeKey(device), device));
 
   try {
     const devices = await fetchTpLinkDevices();
     for (const device of devices) {
-      merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
+      merged.set(deviceCompositeKey(device), device);
     }
   } catch {
     const qrCodes = Array.from(new Set([...taskDevices.map((device) => device.qrCode), ...resultQrCodes]));
     const fetched = await Promise.all(qrCodes.map((qrCode) => fetchTpLinkDeviceByQrCode(qrCode).catch(() => null)));
     for (const device of fetched) {
       if (device) {
-        merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
+        merged.set(deviceCompositeKey(device), device);
       }
     }
   }
@@ -535,7 +535,7 @@ function buildKnownDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   const merged = new Map<string, DeviceRef>();
 
   for (const device of taskDevices) {
-    merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
+    merged.set(deviceCompositeKey(device), device);
   }
 
   for (const qrCode of resultQrCodes) {
@@ -631,14 +631,14 @@ async function getSupabaseSnapshot(includeDevices = true): Promise<AppSnapshot |
   const knownTaskDevices = tasks.flatMap((task) => task.devices);
   const devices = includeDevices ? await loadDevices(knownTaskDevices, resultQrCodes) : buildKnownDevices(knownTaskDevices, resultQrCodes);
   const deviceByCompositeKey = new Map<string, DeviceRef>(
-    devices.map((device) => [`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device] as const)
+    devices.map((device) => [deviceCompositeKey(device), device] as const)
   );
   const deviceByQrCode = new Map(devices.map((device) => [device.qrCode, device] as const));
 
   for (const task of tasks) {
     task.devices = reconcileTaskDevicesWithLiveDevices(
       task.devices.map((device) => {
-        const compositeKey = `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
+        const compositeKey = deviceCompositeKey(device);
         const exactMatch = deviceByCompositeKey.get(compositeKey);
         const sameProfileMatch =
           !exactMatch && device.profileId

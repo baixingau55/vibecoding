@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { dedupeDevicesByIdentity } from "@/lib/domain/device-reconciliation";
 import { fetchTpLinkDevices } from "@/lib/tplink/client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const devices = await fetchTpLinkDevices();
 

@@ -1,6 +1,11 @@
 export type AlgorithmResult = "QUALIFIED" | "UNQUALIFIED" | "UNAVAILABLE";
 export type TpLinkProfileId = string;
-export type TpLinkDeviceSource = "device_application" | "device_application_child" | "project_application" | "entrust";
+export type TpLinkDeviceSource =
+  | "device_application"
+  | "device_application_child"
+  | "project_application"
+  | "project_application_child"
+  | "entrust";
 
 export type TaskStatus =
   | "draft"
