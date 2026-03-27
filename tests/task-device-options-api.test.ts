@@ -8,7 +8,7 @@ describe("task device options API", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns the unified device snapshot without dropping extra channels", async () => {
+  it("returns the live TP-LINK snapshot and keeps additional channels", async () => {
     const devices: DeviceRef[] = [
       {
         qrCode: "device-001",
@@ -18,7 +18,8 @@ describe("task device options API", () => {
         groupName: "Project A",
         previewImage: "https://example.com/1.jpg",
         profileId: "primary",
-        profileName: "Primary"
+        profileName: "Primary",
+        source: "device_application"
       },
       {
         qrCode: "device-001",
@@ -28,7 +29,8 @@ describe("task device options API", () => {
         groupName: "Project A",
         previewImage: "https://example.com/2.jpg",
         profileId: "primary",
-        profileName: "Primary"
+        profileName: "Primary",
+        source: "device_application_child"
       },
       {
         qrCode: "device-001",
@@ -38,7 +40,8 @@ describe("task device options API", () => {
         groupName: "Project A",
         previewImage: "https://example.com/2.jpg",
         profileId: "primary",
-        profileName: "Primary"
+        profileName: "Primary",
+        source: "project_application"
       }
     ];
 

@@ -1,5 +1,6 @@
 export type AlgorithmResult = "QUALIFIED" | "UNQUALIFIED" | "UNAVAILABLE";
 export type TpLinkProfileId = string;
+export type TpLinkDeviceSource = "device_application" | "device_application_child" | "project_application" | "entrust";
 
 export type TaskStatus =
   | "draft"
@@ -64,6 +65,9 @@ export interface DeviceRef {
   previewImage: string;
   profileId?: TpLinkProfileId;
   profileName?: string;
+  parentQrCode?: string;
+  parentMac?: string;
+  source?: TpLinkDeviceSource;
 }
 
 export interface RegionPoint {

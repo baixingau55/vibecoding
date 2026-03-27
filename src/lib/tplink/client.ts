@@ -1,6 +1,6 @@
 import env, { getTpLinkProfiles, hasTpLinkEnv, type TpLinkProfile } from "@/lib/env";
 import { createTpLinkAuthorization } from "@/lib/tplink/signature";
-import type { Algorithm, DeviceRef, TpLinkProfileId } from "@/lib/types";
+import type { Algorithm, DeviceRef, TpLinkDeviceSource, TpLinkProfileId } from "@/lib/types";
 
 const TP_LINK_HOST = "api-smbcloud.tp-link.com.cn";
 const TP_LINK_ENDPOINT = `https://${TP_LINK_HOST}`;
@@ -128,53 +128,241 @@ interface TpLinkEntrustDeviceItem {
   deviceStatus?: number;
   channelId?: number;
   belongEnterpriseName?: string;
+  parentQrCode?: string | null;
+  parentMac?: string | null;
 }
 
-function normalizeText(value: string | undefined, fallback: string) {
+const TP_LINK_DEVICE_PAGE_SIZE = 100;
+const DEVICE_SOURCE_PRIORITY: Record<TpLinkDeviceSource, number> = {
+  device_application: 1,
+  entrust: 2,
+  project_application: 3,
+  device_application_child: 4
+};
+
+function normalizeOptionalText(value: string | null | undefined) {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : fallback;
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeText(value: string | null | undefined, fallback: string) {
+  return normalizeOptionalText(value) ?? fallback;
 }
 
 function mapTpLinkDeviceStatus(value: number | undefined): DeviceRef["status"] {
   return value === 1 ? "online" : "offline";
 }
 
-function mapProjectDevice(item: TpLinkProjectDeviceItem, profile: TpLinkProfile): DeviceRef | null {
-  const qrCode = item.parentQrCode?.trim() || item.qrCode?.trim();
+function mapProjectDevice(item: TpLinkProjectDeviceItem, profile: TpLinkProfile, source: TpLinkDeviceSource): DeviceRef | null {
+  const qrCode = normalizeOptionalText(item.qrCode) ?? normalizeOptionalText(item.parentQrCode);
   if (!qrCode) return null;
 
   return {
     qrCode,
-    mac: item.parentMac?.trim() || item.mac?.trim(),
+    mac: normalizeOptionalText(item.mac) ?? normalizeOptionalText(item.parentMac),
     channelId: item.channelId ?? 1,
     name: normalizeText(item.deviceName, qrCode),
     status: mapTpLinkDeviceStatus(item.deviceStatus),
     groupName: `${profile.name} / ${normalizeText(item.regionName, "默认分组")}`,
     previewImage: DEVICE_PREVIEW_IMAGE,
     profileId: profile.id,
-    profileName: profile.name
+    profileName: profile.name,
+    parentQrCode: normalizeOptionalText(item.parentQrCode),
+    parentMac: normalizeOptionalText(item.parentMac),
+    source
   };
 }
 
-function mapEntrustDevice(item: TpLinkEntrustDeviceItem, profile: TpLinkProfile, fallbackQrCode?: string): DeviceRef | null {
-  const qrCode = item.qrCode?.trim() || fallbackQrCode?.trim();
+function mapEntrustDevice(
+  item: TpLinkEntrustDeviceItem,
+  profile: TpLinkProfile,
+  source: TpLinkDeviceSource,
+  fallbackQrCode?: string
+): DeviceRef | null {
+  const qrCode =
+    normalizeOptionalText(item.qrCode) ?? normalizeOptionalText(fallbackQrCode) ?? normalizeOptionalText(item.parentQrCode);
   if (!qrCode) return null;
 
   return {
     qrCode,
-    mac: item.mac,
+    mac: normalizeOptionalText(item.mac) ?? normalizeOptionalText(item.parentMac),
     channelId: item.channelId ?? 1,
     name: normalizeText(item.deviceName, qrCode),
     status: mapTpLinkDeviceStatus(item.deviceStatus),
     groupName: `${profile.name} / ${normalizeText(item.belongEnterpriseName, "TP-LINK 托管设备")}`,
     previewImage: DEVICE_PREVIEW_IMAGE,
     profileId: profile.id,
-    profileName: profile.name
+    profileName: profile.name,
+    parentQrCode: normalizeOptionalText(item.parentQrCode),
+    parentMac: normalizeOptionalText(item.parentMac),
+    source
   };
 }
 
-function buildFetchedDeviceKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId" | "mac">) {
-  return `${device.profileId ?? "unknown"}:${device.mac?.trim() || device.qrCode}:${device.channelId}`;
+function isPlaceholderGroupName(groupName: string | undefined) {
+  return /托管设备|Entrust/i.test(groupName?.trim() ?? "");
+}
+
+function isPlaceholderDeviceName(device: Pick<DeviceRef, "name" | "qrCode">) {
+  const normalizedName = device.name?.trim();
+  return !normalizedName || normalizedName === device.qrCode;
+}
+
+function referencesParentIdentity(
+  child: Pick<DeviceRef, "profileId" | "channelId" | "parentQrCode" | "parentMac">,
+  parent: Pick<DeviceRef, "profileId" | "channelId" | "qrCode" | "mac">
+) {
+  if ((child.profileId ?? "") !== (parent.profileId ?? "")) return false;
+  if (child.channelId !== parent.channelId) return false;
+
+  return (
+    (Boolean(child.parentQrCode) && child.parentQrCode === parent.qrCode) ||
+    (Boolean(child.parentMac) && Boolean(parent.mac) && child.parentMac === parent.mac)
+  );
+}
+
+function getFetchedDeviceScore(device: DeviceRef) {
+  let score = DEVICE_SOURCE_PRIORITY[device.source ?? "device_application"] * 100;
+
+  if (device.status === "online") score += 40;
+  if (device.parentQrCode || device.parentMac) score += 30;
+  if (!isPlaceholderDeviceName(device)) score += 20;
+  if (!isPlaceholderGroupName(device.groupName)) score += 10;
+  if (device.mac) score += 5;
+
+  return score;
+}
+
+function pickPreferredFetchedDevice(left: DeviceRef, right: DeviceRef) {
+  const leftReferencesRight = referencesParentIdentity(left, right);
+  const rightReferencesLeft = referencesParentIdentity(right, left);
+
+  if (leftReferencesRight !== rightReferencesLeft) {
+    return leftReferencesRight ? left : right;
+  }
+
+  return getFetchedDeviceScore(right) > getFetchedDeviceScore(left) ? right : left;
+}
+
+function mergePreferredName(preferred: DeviceRef, fallback: DeviceRef) {
+  if (!isPlaceholderDeviceName(preferred)) return preferred.name;
+  if (!isPlaceholderDeviceName(fallback)) return fallback.name;
+  return preferred.name || fallback.name;
+}
+
+function mergePreferredGroup(preferred: DeviceRef, fallback: DeviceRef) {
+  if (!isPlaceholderGroupName(preferred.groupName)) return preferred.groupName;
+  if (!isPlaceholderGroupName(fallback.groupName)) return fallback.groupName;
+  return preferred.groupName || fallback.groupName;
+}
+
+function mergeFetchedDevice(left: DeviceRef, right: DeviceRef): DeviceRef {
+  const preferred = pickPreferredFetchedDevice(left, right);
+  const fallback = preferred === left ? right : left;
+
+  return {
+    ...fallback,
+    ...preferred,
+    qrCode: preferred.qrCode || fallback.qrCode,
+    mac: preferred.mac ?? fallback.mac,
+    channelId: preferred.channelId ?? fallback.channelId,
+    name: mergePreferredName(preferred, fallback),
+    status: preferred.status === "online" || fallback.status !== "online" ? preferred.status : fallback.status,
+    groupName: mergePreferredGroup(preferred, fallback),
+    previewImage: preferred.previewImage || fallback.previewImage,
+    profileId: preferred.profileId ?? fallback.profileId,
+    profileName: preferred.profileName ?? fallback.profileName,
+    parentQrCode: preferred.parentQrCode ?? fallback.parentQrCode,
+    parentMac: preferred.parentMac ?? fallback.parentMac,
+    source: preferred.source ?? fallback.source
+  };
+}
+
+function findExactFetchedDeviceIndex(devices: DeviceRef[], candidate: DeviceRef) {
+  return devices.findIndex((device) => {
+    if ((device.profileId ?? "") !== (candidate.profileId ?? "")) return false;
+    if (device.channelId !== candidate.channelId) return false;
+
+    return (
+      (Boolean(device.qrCode) && device.qrCode === candidate.qrCode) ||
+      (Boolean(device.mac) && Boolean(candidate.mac) && device.mac === candidate.mac)
+    );
+  });
+}
+
+function isCrossSourceDuplicate(left: DeviceRef, right: DeviceRef) {
+  if ((left.profileId ?? "") !== (right.profileId ?? "")) return false;
+  if (left.channelId !== right.channelId) return false;
+  if (left.name !== right.name) return false;
+  if (left.groupName !== right.groupName) return false;
+  if (!left.source || !right.source || left.source === right.source) return false;
+
+  return referencesParentIdentity(left, right) || referencesParentIdentity(right, left);
+}
+
+function dedupeFetchedDevices(devices: DeviceRef[]) {
+  const exactMerged: DeviceRef[] = [];
+
+  for (const device of devices) {
+    const existingIndex = findExactFetchedDeviceIndex(exactMerged, device);
+    if (existingIndex === -1) {
+      exactMerged.push(device);
+      continue;
+    }
+
+    exactMerged[existingIndex] = mergeFetchedDevice(exactMerged[existingIndex], device);
+  }
+
+  const crossSourceMerged: DeviceRef[] = [];
+
+  for (const device of exactMerged) {
+    const existingIndex = crossSourceMerged.findIndex((item) => isCrossSourceDuplicate(item, device));
+    if (existingIndex === -1) {
+      crossSourceMerged.push(device);
+      continue;
+    }
+
+    crossSourceMerged[existingIndex] = mergeFetchedDevice(crossSourceMerged[existingIndex], device);
+  }
+
+  return crossSourceMerged;
+}
+
+async function fetchPagedDeviceSource<T>(
+  profile: TpLinkProfile,
+  path: string,
+  buildPayload: (start: number, limit: number) => Record<string, unknown>,
+  mapItem: (item: T, profile: TpLinkProfile) => DeviceRef | null
+) {
+  const devices: DeviceRef[] = [];
+  let start = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (start < total) {
+    const response = await tpLinkPostForProfile<TpLinkListResponse<T>>(profile, path, buildPayload(start, TP_LINK_DEVICE_PAGE_SIZE));
+
+    if (response.error_code !== 0) {
+      throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
+    }
+
+    const list = response.result.list ?? [];
+    total = response.result.total ?? list.length;
+
+    for (const item of list) {
+      const device = mapItem(item, profile);
+      if (device) {
+        devices.push(device);
+      }
+    }
+
+    if (list.length < TP_LINK_DEVICE_PAGE_SIZE) {
+      break;
+    }
+
+    start += TP_LINK_DEVICE_PAGE_SIZE;
+  }
+
+  return devices;
 }
 
 export async function fetchTpLinkAlgorithms() {
@@ -232,55 +420,73 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
   }
 
   deviceListInFlight = (async () => {
-    const endpoints = [
-      "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
-      "/tums/open/deviceManager/v1/getDeviceListInProjectApplication"
-    ] as const;
     const profiles = getTpLinkProfiles();
-    const merged = new Map<string, DeviceRef>();
+    const allDevices: DeviceRef[] = [];
     let lastError: Error | null = null;
 
     for (const profile of profiles) {
-      for (const path of endpoints) {
-        try {
-          const limit = 100;
-          let start = 0;
-          let total = Number.POSITIVE_INFINITY;
+      try {
+        allDevices.push(
+          ...(await fetchPagedDeviceSource<TpLinkProjectDeviceItem>(
+            profile,
+            "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
+            (start, limit) => ({ start, limit }),
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application")
+          ))
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
+      }
 
-          while (start < total) {
-            const response = await tpLinkPostForProfile<TpLinkListResponse<TpLinkProjectDeviceItem>>(profile, path, { start, limit });
+      try {
+        allDevices.push(
+          ...(await fetchPagedDeviceSource<TpLinkProjectDeviceItem>(
+            profile,
+            "/tums/open/deviceManager/v1/getDeviceListInDeviceApplication",
+            (start, limit) => ({
+              start,
+              limit,
+              filterAnd: { hasChild: 1 }
+            }),
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "device_application_child")
+          ))
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
+      }
 
-            if (response.error_code !== 0) {
-              throw new Error(`TP-LINK device fetch failed with error_code=${response.error_code}`);
-            }
+      try {
+        allDevices.push(
+          ...(await fetchPagedDeviceSource<TpLinkProjectDeviceItem>(
+            profile,
+            "/tums/open/deviceManager/v1/getDeviceListInProjectApplication",
+            (start, limit) => ({ start, limit }),
+            (item, currentProfile) => mapProjectDevice(item, currentProfile, "project_application")
+          ))
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
+      }
 
-            const list = response.result.list ?? [];
-            total = response.result.total ?? list.length;
-
-            for (const item of list) {
-              const device = mapProjectDevice(item, profile);
-              if (device) {
-                merged.set(buildFetchedDeviceKey(device), device);
-              }
-            }
-
-            if (list.length < limit) {
-              break;
-            }
-
-            start += limit;
-          }
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
-        }
+      try {
+        allDevices.push(
+          ...(await fetchPagedDeviceSource<TpLinkEntrustDeviceItem>(
+            profile,
+            "/tums/open/deviceEntrust/v1/getEntrustDeviceList",
+            (start, limit) => ({ start, limit }),
+            (item, currentProfile) => mapEntrustDevice(item, currentProfile, "entrust")
+          ))
+        );
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Unknown TP-LINK device fetch error.");
       }
     }
 
-    if (merged.size === 0 && lastError) {
+    if (allDevices.length === 0 && lastError) {
       throw lastError;
     }
 
-    const devices = Array.from(merged.values());
+    const devices = dedupeFetchedDevices(allDevices);
     cachedDeviceList = devices;
     cachedDeviceListAt = Date.now();
     return devices;
@@ -312,7 +518,7 @@ export async function fetchTpLinkDeviceByQrCode(qrCode: string, profileId?: TpLi
       );
 
       if (response.error_code === 0) {
-        const device = mapEntrustDevice(response.result?.list?.[0] ?? {}, profile, qrCode);
+        const device = mapEntrustDevice(response.result?.list?.[0] ?? {}, profile, "entrust", qrCode);
         if (device) {
           return device;
         }
