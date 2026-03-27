@@ -172,10 +172,11 @@ describe("agent create task APIs", () => {
     expect(retryPayload.status).toBe("error");
     expect(retryPayload.suggestedReply).toContain("未找到");
   });
+
   it("uses the default open draft when no conversationId is provided", async () => {
     const first = await createDraftPOST(
       buildRequest("http://localhost/api/agent/tasks/create-draft", {
-        rawUserQuery: "甯垜鍒涘缓涓€涓宀楀贰妫€浠诲姟",
+        rawUserQuery: "帮我创建一个离岗巡检任务",
         userAction: "continue"
       })
     );
@@ -185,7 +186,7 @@ describe("agent create task APIs", () => {
 
     const second = await createDraftPOST(
       buildRequest("http://localhost/api/agent/tasks/create-draft", {
-        rawUserQuery: "鍛ㄥ洓鏃╀笂9鐐规墽琛岋紝妫€鏌ュ叏閮ㄨ澶?,
+        rawUserQuery: "周四早上9点执行，检查全部设备",
         userAction: "continue"
       })
     );
@@ -194,7 +195,7 @@ describe("agent create task APIs", () => {
 
     const confirm = await confirmCreatePOST(
       buildRequest("http://localhost/api/agent/tasks/confirm-create", {
-        rawUserQuery: "纭鍒涘缓",
+        rawUserQuery: "确认创建",
         userAction: "confirm"
       })
     );

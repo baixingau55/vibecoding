@@ -494,19 +494,19 @@ async function ensureBaseRows() {
 
 async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   const merged = new Map<string, DeviceRef>();
-  taskDevices.forEach((device) => merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device));
+  taskDevices.forEach((device) => merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device));
 
   try {
     const devices = await fetchTpLinkDevices();
     for (const device of devices) {
-      merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device);
+      merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
     }
   } catch {
     const qrCodes = Array.from(new Set([...taskDevices.map((device) => device.qrCode), ...resultQrCodes]));
     const fetched = await Promise.all(qrCodes.map((qrCode) => fetchTpLinkDeviceByQrCode(qrCode).catch(() => null)));
     for (const device of fetched) {
       if (device) {
-        merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}`, device);
+        merged.set(`${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`, device);
       }
     }
   }
@@ -514,7 +514,7 @@ async function loadDevices(taskDevices: DeviceRef[], resultQrCodes: string[]) {
   for (const qrCode of resultQrCodes) {
     const hasQrCode = Array.from(merged.values()).some((device) => device.qrCode === qrCode);
     if (!hasQrCode) {
-      merged.set(`result:${qrCode}`, {
+      merged.set(`result:${qrCode}:1`, {
         qrCode,
         channelId: 1,
         name: qrCode,

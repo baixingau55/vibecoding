@@ -171,6 +171,10 @@ function mapEntrustDevice(item: TpLinkEntrustDeviceItem, profile: TpLinkProfile,
   };
 }
 
+function buildFetchedDeviceKey(device: Pick<DeviceRef, "profileId" | "qrCode" | "channelId">) {
+  return `${device.profileId ?? "unknown"}:${device.qrCode}:${device.channelId}`;
+}
+
 export async function fetchTpLinkAlgorithms() {
   const profiles = getTpLinkProfiles();
   const merged = new Map<string, Algorithm>();
@@ -260,7 +264,7 @@ export async function fetchTpLinkDevices(): Promise<DeviceRef[]> {
             for (const item of list) {
               const device = mapProjectDevice(item, profile);
               if (device) {
-                merged.set(`${device.profileId}:${device.qrCode}`, device);
+                merged.set(buildFetchedDeviceKey(device), device);
               }
             }
 
